@@ -1,0 +1,1147 @@
+- id: KB-HEC-ROI_FLOOR-001
+  metric: roi_floor
+  severity: null
+  status: null
+  keywords:
+  - floor
+  - general
+  - roi
+  - roi_floor
+  diagnosis_template: 'ROI floor: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: 1. Toàn bộ phễu bị chi phối ĐỒNG THỜI
+
+    2. Nâng floor → hệ thống co tệp → ratio đẹp giả + volume chết
+
+    3. Hệ thống KHÔNG tiêu hết budget khi floor cao.'
+  action_templates:
+  - Hạ 0.2 mỗi 2 ngày.
+  - 'DỪNG khi đạt BẤT KỲ:'
+  - (a) Floor = 3.0 (sàn tuyệt đối)
+  - (b) Imp >200K/ngày + ROI ≥2.5x
+  - (c) CPA đơn thực >70K × 3 ngày (stop-loss)
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: general
+    thresholds_pct: 'Scale: 2.5-3.0x
+
+      Test: tùy giai đoạn'
+    thresholds_abs: Xem Impressions + Đơn tuyệt đối
+- id: KB-HEC-IMP_VIDEO-002
+  metric: imp_video
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - awareness
+  - imp
+  - imp_video
+  - organic
+  - video
+  diagnosis_template: "Imp VIDEO\n(Ads+Organic+AFF): kiểm tra theo Funnel Matrix v12.\
+    \ Nhóm yếu tố ảnh hưởng ưu tiên: 1. ROI floor (DRIVER #1)\n2. Budget utilization\
+    \ (<50% = throttle)\n3. Creative pool \n4. Video freshness (Video mới) \n5. CPM."
+  action_templates:
+  - Hạ ROI floor (rule 3 stop).
+  - Check utilization Spend/Budget.
+  - Bổ sung creative (30-40 video/ngày capacity).
+  - Refresh liên tục.
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🔵 TẦNG 1 — AWARENESS (Người dùng THẤY sản phẩm)
+    thresholds_pct: —
+    thresholds_abs: 'Imp VIDEO/ngày:
+
+      🔴<50K 🟡50-150K ✅>150K
+
+      Utilization: 🔴<50% ✅>80%'
+- id: KB-HEC-IMP_PRODUCT_CARD-003
+  metric: imp_product_card
+  severity: null
+  status: null
+  keywords:
+  - awareness
+  - card
+  - imp
+  - imp_product_card
+  - product
+  diagnosis_template: "Imp THẺ SẢN PHẨM\n(Product Card): kiểm tra theo Funnel Matrix\
+    \ v12. Nhóm yếu tố ảnh hưởng ưu tiên: 1. SEO title + keyword\n2. Rating ★ (<4.5\
+    \ → giảm exposure)\n3. Số lượt đánh giá SP (bằng text/hình ảnh/video) \n4. SES\
+    \ Score (Điểm shop)\n5. Search volume keyword\n6. Số đơn đã bán (7 - 30 ngày)\n\
+    7. Thumbnail, hình ảnh \n8. Flash Sale."
+  action_templates:
+  - Audit SEO title vs top 3 đối thủ.
+  - Pull rating ★ hàng tháng.
+  - Tăng review (voucher program).
+  - Check SES score hàng tuần.
+  owner_default: Ops + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🔵 TẦNG 1 — AWARENESS (Người dùng THẤY sản phẩm)
+    thresholds_pct: 'Rating: 🔴<4.3★ 🟡4.3-4.6★ ✅>4.6★
+
+      SES: 🔴<3.5 ✅>4.5'
+    thresholds_abs: 'Review: 🔴<100 🟡100-500 ✅>500'
+- id: KB-HEC-CPM-004
+  metric: cpm
+  severity: null
+  status: null
+  keywords:
+  - awareness
+  - cpm
+  diagnosis_template: 'CPM: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng
+    ưu tiên: 1. ROI floor
+
+    2. Creative
+
+    3. Targeting (độ tuổi, giới tính, nhân khẩu học...)
+
+    4. Thời điểm (Sale, lễ, tết ... ).'
+  action_templates:
+  - Check competition Kalodata hàng tuần
+  owner_default: SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🔵 TẦNG 1 — AWARENESS (Người dùng THẤY sản phẩm)
+    thresholds_pct: ✅<6,500 🟡6,500-9,000 🔴>9,000 VND
+    thresholds_abs: —
+- id: KB-HEC-SPEND-005
+  metric: spend
+  severity: null
+  status: null
+  keywords:
+  - awareness
+  - chi
+  - spend
+  diagnosis_template: 'Chi phí QC/ngày
+
+    (Spend): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng ưu tiên: 1. Budget
+    allocation CEO
+
+    2. ROI floor (tự giảm spend khi floor cao)
+
+    3. Creative pool
+
+    4. Voucher.'
+  action_templates:
+  - 'Check: hệ thống tiêu hết budget không?'
+  - Spend << Budget → ROI floor quá cao
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🔵 TẦNG 1 — AWARENESS (Người dùng THẤY sản phẩm)
+    thresholds_pct: —
+    thresholds_abs: 🔴<5M 🟡5-15M ✅>15M (khi ROI≥2.5x)
+- id: KB-HEC-RATE_6S-006
+  metric: rate_6s
+  severity: null
+  status: null
+  keywords:
+  - consideration
+  - leading
+  - rate
+  - rate_6s
+  - xem
+  diagnosis_template: "Rate 6s ★LEADING\n(Tỷ lệ xem 6 giây): kiểm tra theo Funnel\
+    \ Matrix v12. Nhóm yếu tố ảnh hưởng ưu tiên: 1. Nguồn video (KOL/KOC tỉ lệ xem\
+    \ cao hơn) \n2. Hook (0-3s) + Body (4-6s)\n3. Format: B&A > Demo > Review > FOMO\n\
+    4. Audience match."
+  action_templates:
+  - Sort video Rate 6s hàng ngày.
+  - TẮT video <2% (hạng D, ≥1K imp).
+  - Ưu tiên Creator ≥50% pool.
+  owner_default: SaoBT + TuND
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟢 TẦNG 2 — CONSIDERATION (Người dùng XEM + NHẤP)
+    thresholds_pct: '🔴<2% 🟡2-11% ✅>11%
+
+      (percentile Q25/Q75
+
+      11 video KTM 25/03)'
+    thresholds_abs: —
+- id: KB-HEC-CTR-007
+  metric: ctr
+  severity: null
+  status: null
+  keywords:
+  - consideration
+  - ctr
+  - xem
+  diagnosis_template: "CTR\n(Tỷ lệ nhấp): kiểm tra theo Funnel Matrix v12. Nhóm yếu\
+    \ tố ảnh hưởng ưu tiên: 1. Hook (0-3s) \n2. Rate 6s (leading)\n3. Format: B&A\
+    \ > Demo > Review > FOMO \n4. Quà tặng\n5. Giá bán \n6. Ảnh bìa\n7. KOC/KOL."
+  action_templates:
+  - Refresh hook 5/tuần trên body winner.
+  - 'Mix: 40% B&A + 30% Review + 20% Demo + 10% FOMO.'
+  owner_default: SaoBT + TuND
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟢 TẦNG 2 — CONSIDERATION (Người dùng XEM + NHẤP)
+    thresholds_pct: '🔴<1% 🟡1-5% ✅>5%
+
+      (video-level, percentile)'
+    thresholds_abs: 'PHẢI kèm Clicks tuyệt đối.
+
+      CTR 2.5%×68K = 1,723
+
+      CTR 1.5%×300K = 4,500'
+- id: KB-HEC-CREATIVE_POOL-008
+  metric: creative_pool
+  severity: null
+  status: null
+  keywords:
+  - ang
+  - consideration
+  - creative
+  - creative_pool
+  - pool
+  - video
+  - xem
+  diagnosis_template: "Creative pool\n(video đang phân phối): kiểm tra theo Funnel\
+    \ Matrix v12. Nhóm yếu tố ảnh hưởng ưu tiên: 1. Tổng số video trong Camp \n2.\
+    \ ROI \n3. Chương trình khuyến mại\n4. Giá bán \n5. Tăng tốc thử nghiệm."
+  action_templates:
+  - Capacity 30-40 video/ngày → pool KHÔNG thiếu.
+  - Vấn đề = winner rate.
+  - 'Target: ≥15% video đạt S+A.'
+  owner_default: TuND + HoangNH
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟢 TẦNG 2 — CONSIDERATION (Người dùng XEM + NHẤP)
+    thresholds_pct: —
+    thresholds_abs: '🔴<15 video Rate 6s ≥3%
+
+      🟡15-25 ✅>25
+
+      Creator: 🔴<30% ✅>50%
+
+      Winner rate: 🔴<10% ✅≥15%'
+- id: KB-HEC-ORDERS-009
+  metric: orders
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - conversion
+  - live
+  - orders
+  - organic
+  diagnosis_template: 'Số đơn/ngày (Orders): kiểm tra theo Funnel Matrix v12. Nhóm
+    yếu tố ảnh hưởng ưu tiên: Impressions × CTR × CVR | ROI floor | Live | AFF.'
+  action_templates:
+  - North Star VOLUME. Đơn giảm 3 ngày → check ROI floor + creative pool
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: '🟠 TẦNG 3 — CONVERSION: Chỉ số TỔNG HỢP (Ads + Live + AFF + Organic)'
+    thresholds_pct: —
+    thresholds_abs: 🔴<200 🟡200-400 ✅>400 đơn/ngày
+- id: KB-HEC-REVENUE-010
+  metric: revenue
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - conversion
+  - doanh
+  - live
+  - organic
+  - revenue
+  diagnosis_template: 'Doanh số/ngày (Revenue): kiểm tra theo Funnel Matrix v12. Nhóm
+    yếu tố ảnh hưởng ưu tiên: Số đơn × AOV | DS Ads + Live + AFF + Organic.'
+  action_templates:
+  - Tách DS theo kênh hàng tuần.
+  - 1 kênh >70% = 🔴 rủi ro tập trung.
+  - 'KTMR: Paid ~80%, Live ~20%.'
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: '🟠 TẦNG 3 — CONVERSION: Chỉ số TỔNG HỢP (Ads + Live + AFF + Organic)'
+    thresholds_pct: '1 kênh >70%=🔴
+
+      60-70%=🟡
+
+      <60%=✅'
+    thresholds_abs: 🔴<40M 🟡40-80M ✅>80M/ngày
+- id: KB-HEC-AOV-011
+  metric: aov
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - aov
+  - conversion
+  - live
+  - organic
+  diagnosis_template: 'AOV: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng
+    ưu tiên: Giá SP | Combo | Voucher | Product mix.'
+  action_templates:
+  - 'KTMR: single 98% DS. Combo 1.5-3.5%.'
+  owner_default: SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: '🟠 TẦNG 3 — CONVERSION: Chỉ số TỔNG HỢP (Ads + Live + AFF + Organic)'
+    thresholds_pct: —
+    thresholds_abs: 'KTMR: 160-179K'
+- id: KB-HEC-CPA-012
+  metric: cpa
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - chi
+  - conversion
+  - cpa
+  - live
+  - organic
+  diagnosis_template: 'CPA đơn thực
+
+    (Chi phí/đơn hoàn thành): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng
+    ưu tiên: Tổng hợp 3 tầng | ROI floor.'
+  action_templates:
+  - 🔴>70K = CẢNH BÁO (review ngay, KHÔNG dừng hạ floor vì 1 ngày).
+  - Stop-loss = >70K × 3 ngày liền → dừng hạ floor.
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: '🟠 TẦNG 3 — CONVERSION: Chỉ số TỔNG HỢP (Ads + Live + AFF + Organic)'
+    thresholds_pct: 🔴>70K 🟡55-70K ✅<55K
+    thresholds_abs: '⚠️ CPA TTMS 274 VND ≠ đơn thực!
+
+      "Kết quả" TTMS có thể = view content.
+
+      Đơn thực 25/03 = ~81.'
+- id: KB-HEC-IMPRESSIONS_VIDEO-013
+  metric: impressions_video
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - block
+  - conversion
+  - impressions
+  - impressions_video
+  - organic
+  - video
+  diagnosis_template: "Impressions VIDEO: kiểm tra theo Funnel Matrix v12. Nhóm yếu\
+    \ tố ảnh hưởng ưu tiên: 1. ROI floor (DRIVER #1)\n2. Budget utilization (<50%\
+    \ = throttle)\n3. Creative pool \n4. Video freshness (Video mới) \n5. CPM."
+  action_templates:
+  - Hạ ROI floor (rule 3 stop).
+  - Check utilization.
+  - Bổ sung creative 30-40 video/ngày.
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🎬 BLOCK 3A — CONVERSION VIDEO (Ads + Organic + AFF)
+    thresholds_pct: —
+    thresholds_abs: '🔴<50K 🟡50-150K ✅>150K/ngày
+
+      Utilization: 🔴<50% ✅>80%'
+- id: KB-HEC-CTR-014
+  metric: ctr
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - block
+  - conversion
+  - ctr
+  - organic
+  - video
+  diagnosis_template: "CTR VIDEO: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh\
+    \ hưởng ưu tiên: 1. Rate 6s \n2. Hook \n3. Format \n4. CTA \n5. Creator vs Tự\
+    \ làm."
+  action_templates:
+  - Sort Rate 6s hàng ngày. Tắt hạng D.
+  - Refresh hook. Ưu tiên Creator.
+  owner_default: SaoBT + TuND
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🎬 BLOCK 3A — CONVERSION VIDEO (Ads + Organic + AFF)
+    thresholds_pct: '🔴<1% 🟡1-5% ✅>5%
+
+      (video-level)'
+    thresholds_abs: Kèm Clicks tuyệt đối
+- id: KB-HEC-CVR_VIDEO-015
+  metric: cvr_video
+  severity: null
+  status: null
+  keywords:
+  - ads
+  - aff
+  - block
+  - conversion
+  - cvr
+  - cvr_video
+  - organic
+  - video
+  diagnosis_template: "CVR VIDEO: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh\
+    \ hưởng ưu tiên: 1. CTA trong video \n2. Demo kết quả/B&A (giây 6+) \n3. Show\
+    \ giá/deal/CTKM quà tặng.\n4. Testimonial (chứng thực: bác sỹ, KOL, giấy tờ sản\
+    \ phẩm)\n5. Seeding (comment trong video)\n6. Format: B&A > Demo > Review > FOMO."
+  action_templates:
+  - Audit CTA top 10 video.
+  - Test product tag timing.
+  - 'Checklist: mọi video PHẢI có demo.'
+  - CTR>2% + CVR<0.3% = video giải trí.
+  owner_default: TuND + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🎬 BLOCK 3A — CONVERSION VIDEO (Ads + Organic + AFF)
+    thresholds_pct: 'CTR>2% mà CVR<0.3%
+
+      = 🔴 video giải trí'
+    thresholds_abs: '% video có CTA:
+
+      🔴<50% 🟡50-80% ✅>80%'
+- id: KB-HEC-IMPRESSIONS_TH_SP-016
+  metric: impressions_th_sp
+  severity: null
+  status: null
+  keywords:
+  - block
+  - card
+  - conversion
+  - impressions
+  - impressions_th_sp
+  - product
+  diagnosis_template: "Impressions THẺ SP: kiểm tra theo Funnel Matrix v12. Nhóm yếu\
+    \ tố ảnh hưởng ưu tiên: 1. SEO title + keyword\n2. Rating ★ (<4.5 → giảm exposure)\n\
+    3. Số lượt đánh giá SP (bằng text/hình ảnh/video) \n4. SES Score (Điểm shop)\n\
+    5. Search volume keyword\n6. Số đơn đã bán (7 - 30 ngày)\n7. Thumbnail, hình ảnh\
+    \ \n8. Flash Sale."
+  action_templates:
+  - Audit SEO vs đối thủ. Tăng review. Fix rating. Check SES.
+  owner_default: Ops + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🏷️ BLOCK 3B — CONVERSION THẺ SẢN PHẨM (Product Card)
+    thresholds_pct: 'Rating 🔴<4.3★ ✅>4.6★
+
+      SES 🔴<3.5 ✅>4.5'
+    thresholds_abs: Review 🔴<100 ✅>500
+- id: KB-HEC-CTR-017
+  metric: ctr
+  severity: null
+  status: null
+  keywords:
+  - block
+  - card
+  - conversion
+  - ctr
+  - product
+  diagnosis_template: "CTR THẺ SP: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh\
+    \ hưởng ưu tiên: 1. Ảnh bìa/thumbnail  \n2. Giá bán/CTKM\n3. Badge (huy hiệu thẻ\
+    \ sản phẩm bán chạy Bestseller/Flash Sale) \n4. Tiêu đề chuẩn SEO."
+  action_templates:
+  - Audit ảnh vs đối thủ. So giá. Đăng ký badge.
+  owner_default: Ops + Marketing
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🏷️ BLOCK 3B — CONVERSION THẺ SẢN PHẨM (Product Card)
+    thresholds_pct: So CTR thẻ vs đối thủ
+    thresholds_abs: —
+- id: KB-HEC-CVR_TH_SP-018
+  metric: cvr_th_sp
+  severity: null
+  status: null
+  keywords:
+  - block
+  - card
+  - conversion
+  - cvr
+  - cvr_th_sp
+  - product
+  diagnosis_template: "CVR THẺ SP: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh\
+    \ hưởng ưu tiên: 1. Ảnh chi tiết + video listing \n2. Mô tả SP \n3. Giá bán/ CTKM\
+    \ \n4. Rating + review \n5. Đổi trả \n6. Giao hàng \n7. Live replay\n8. Số lượt\
+    \ bán \n9. Số lượt đánh giá \n10. Feedback khách hàng\n11. Badge (huy hiệu thẻ\
+    \ sản phẩm bán chạy Bestseller/Flash Sale)."
+  action_templates:
+  - Audit listing vs đối thủ. Video demo trong listing. Trả lời Q&A <2h.
+  - KTMR CVR thẻ 6.3-7.3% = ổn → KHÔNG phải vấn đề chính.
+  owner_default: Ops + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🏷️ BLOCK 3B — CONVERSION THẺ SẢN PHẨM (Product Card)
+    thresholds_pct: 'Product card CVR:
+
+      🔴<3% 🟡3-6% ✅>6%'
+    thresholds_abs: 'KTMR: 6.3-7.3% = ✅'
+- id: KB-HEC-HO_N_H_Y-019
+  metric: ho_n_h_y
+  severity: null
+  status: null
+  keywords:
+  - ho_n_h_y
+  - quay
+  - retention
+  - thi
+  diagnosis_template: 'Hoàn hủy %: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: Chất lượng SP | Shipping | Đóng gói | Kỳ vọng.'
+  action_templates:
+  - Pull reason breakdown. Fix top 1 reason.
+  - 'KTMR: 19.7→16% (cải thiện)'
+  owner_default: Ngọc + Ops
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: 🔴>25% 🟡20-25% ✅<20%
+    thresholds_abs: —
+- id: KB-HEC-REVIEW-020
+  metric: review
+  severity: null
+  status: null
+  keywords:
+  - quay
+  - retention
+  - review
+  - thi
+  diagnosis_template: 'Review ★: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: Chất lượng SP | Shipping | Đóng gói.'
+  action_templates:
+  - Pull ★ theo tháng. <4.5★ → product/trust issue
+  owner_default: Ngọc
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: 🔴<4.3★ 🟡4.3-4.6★ ✅>4.6★
+    thresholds_abs: —
+- id: KB-HEC-REPEAT_PURCHASE-021
+  metric: repeat_purchase
+  severity: null
+  status: null
+  keywords:
+  - purchase
+  - quay
+  - repeat
+  - repeat_purchase
+  - retention
+  - thi
+  diagnosis_template: 'Repeat purchase %: kiểm tra theo Funnel Matrix v12. Nhóm yếu
+    tố ảnh hưởng ưu tiên: Chất lượng SP | Remarketing (Zalo) | Giá bán.'
+  action_templates:
+  - 'Phase 1: New vs Returning. Phase 2: Cohort 30/60/90.'
+  - HIỆN THIẾU — blocking item C4
+  owner_default: SaoBT + Ngọc
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: 🔴<5% 🟡5-15% ✅>15%
+    thresholds_abs: —
+- id: KB-HEC-LTV-022
+  metric: ltv
+  severity: null
+  status: null
+  keywords:
+  - ltv
+  - quay
+  - retention
+  - thi
+  diagnosis_template: 'LTV: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng
+    ưu tiên: Repeat % × AOV × Frequency.'
+  action_templates:
+  - LTV cao → chịu CPA cao → hạ ROI floor → mở tệp
+  owner_default: CEO + Finance
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: —
+    thresholds_abs: —
+- id: KB-HEC-ENGAGEMENT_RATE_K_NH_TH_T_L_T_NG_T_C-023
+  metric: engagement_rate_k_nh_th_t_l_t_ng_t_c
+  severity: null
+  status: null
+  keywords:
+  - engagement
+  - engagement_rate_k_nh_th_t_l_t_ng_t_c
+  - quay
+  - rate
+  - retention
+  - thi
+  diagnosis_template: 'Engagement rate kênh TH
+
+    (Tỷ lệ tương tác): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng ưu tiên:
+    ① Chất lượng content đăng kênh
+
+    ② Tần suất đăng (30-40 video/ngày)
+
+    ③ Reply comment 100%
+
+    ④ Consistency nội dung
+
+    ⑤ Spend TTMS trên video kênh TH → tương tác đổ về TH (vs KOL → đổ về creator).'
+  action_templates:
+  - Đăng 30-40 video/ngày (AI + cắt ghép).
+  - Reply comment 100%.
+  - Video winner trên kênh TH → ADD vào camp GMV Max.
+  owner_default: TuND + Marketing
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: 🔴<1% ER 🟡1-3% ✅>3%
+    thresholds_abs: —
+- id: KB-HEC-FOLLOWERS_K_NH_TH-024
+  metric: followers_k_nh_th
+  severity: null
+  status: null
+  keywords:
+  - followers
+  - followers_k_nh_th
+  - quay
+  - retention
+  - thi
+  diagnosis_template: 'Followers kênh TH: kiểm tra theo Funnel Matrix v12. Nhóm yếu
+    tố ảnh hưởng ưu tiên: Content viral | TTMS spend trên kênh | Collab.'
+  action_templates:
+  - Track weekly. Followers = warm audience cho Live.
+  owner_default: Marketing
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: Theo giai đoạn
+    thresholds_abs: —
+- id: KB-HEC-TRACK_A_B_CREATOR_VS_T_L_M_K_NH_TH-025
+  metric: track_a_b_creator_vs_t_l_m_k_nh_th
+  severity: null
+  status: null
+  keywords:
+  - creator
+  - quay
+  - retention
+  - thi
+  - track
+  - track_a_b_creator_vs_t_l_m_k_nh_th
+  diagnosis_template: 'Track A/B
+
+    (Creator vs Tự làm kênh TH): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: Track A: Creator (KOL/AFF) → kênh Creator → Maximize GMV
+
+    Track B: Tự làm → kênh TH → kiểm soát CTR + build kênh.'
+  action_templates:
+  - 'Tỷ trọng khởi đầu: A 60-70% / B 30-40%.'
+  - Test 2 tuần → pull data Rate 6s + CTR + CPA mỗi track → data quyết định.
+  - Track B Rate 6s cải thiện → tăng tỷ trọng dần.
+  owner_default: SaoBT + CEO
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: —
+    thresholds_abs: 'Track B: 🔴<20% 🟡20-40% ✅30-40%
+
+      Test 2 tuần rồi điều chỉnh'
+- id: KB-HEC-T_NG_1_HI_U_GI_I_TH_CH_NGUY_N_L_SP-026
+  metric: t_ng_1_hi_u_gi_i_th_ch_nguy_n_l_sp
+  severity: null
+  status: null
+  keywords:
+  - nguy
+  - quay
+  - retention
+  - t_ng_1_hi_u_gi_i_th_ch_nguy_n_l_sp
+  - thi
+  diagnosis_template: 'Tầng 1: HIỂU
+
+    (Giải thích nguyên lý SP): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng
+    ưu tiên: Video khoa học, cơ chế, thành phần
+
+    → Consideration + Conversion
+
+    → Rate 6s↑↑ (xem sâu), CTR↑, CVR↑.'
+  action_templates:
+  - Phục vụ Consideration + Conversion.
+  - TopView (Awareness) = campaign riêng, budget riêng.
+  - Đây KHÔNG phải video cho TopView.
+  owner_default: TuND
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: —
+    thresholds_abs: —
+- id: KB-HEC-T_NG_2_TIN_KOL_TRUST_REVIEW-027
+  metric: t_ng_2_tin_kol_trust_review
+  severity: null
+  status: null
+  keywords:
+  - kol
+  - quay
+  - retention
+  - review
+  - t_ng_2_tin_kol_trust_review
+  - thi
+  - tin
+  - trust
+  diagnosis_template: 'Tầng 2: TIN
+
+    (KOL trust/review): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng ưu
+    tiên: Video review, trải nghiệm, social proof
+
+    → Consideration + Conversion
+
+    → Rate 6s↑ + CTR↑↑ + CVR↑↑
+
+    Đa dụng nhất — cân bằng 3 metric.'
+  action_templates:
+  - Video đa dụng nhất cho GMV Max.
+  - Sử dụng cả KOL video + review thực.
+  owner_default: TuND + HoangNH
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: —
+    thresholds_abs: —
+- id: KB-HEC-T_NG_3_MUA_VIDEO_CHUY_N_I-028
+  metric: t_ng_3_mua_video_chuy_n_i
+  severity: null
+  status: null
+  keywords:
+  - chuy
+  - mua
+  - quay
+  - retention
+  - t_ng_3_mua_video_chuy_n_i
+  - thi
+  - video
+  diagnosis_template: 'Tầng 3: MUA
+
+    (Video chuyển đổi): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng ưu
+    tiên: Video deal, urgency, B&A, CTA mạnh
+
+    → Conversion
+
+    → CTR↑↑ + CVR↑↑↑ nhưng Rate 6s TB
+
+    Scale nhanh nhưng fatigue nhanh.'
+  action_templates:
+  - Hiệu quả nhất cho conversion.
+  - Nhưng pool toàn Tầng 3 → creative fatigue nhanh.
+  owner_default: TuND
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: —
+    thresholds_abs: —
+- id: KB-HEC-MIX_CONTENT_T_L_3_T_NG-029
+  metric: mix_content_t_l_3_t_ng
+  severity: null
+  status: null
+  keywords:
+  - content
+  - mix
+  - mix_content_t_l_3_t_ng
+  - quay
+  - retention
+  - thi
+  diagnosis_template: 'Mix Content
+
+    (Tỷ lệ 3 tầng): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng ưu tiên:
+    Team tag video theo 3 tầng → chạy 2 tuần → pull data Rate 6s + CTR + CVR theo
+    tầng → tầng nào win → tăng tỷ trọng.'
+  action_templates:
+  - KHÔNG ghi tỷ lệ cố định.
+  - 'Quy trình: Tag → Chạy → Pull data → Data quyết định.'
+  - Audit hàng tháng.
+  - Pool toàn FOMO/Tầng 3 (>50%) = 🔴
+  owner_default: TuND + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: Bản chỉnh sửa
+    section: 🟣 TẦNG 4 — RETENTION (Khách QUAY LẠI + GIỚI THIỆU)
+    thresholds_pct: Pool toàn Tầng 3 >50% = 🔴
+    thresholds_abs: 'Data quyết định tỷ lệ,
+
+      không phải template'
+- id: KB-HEC-IMP-001
+  metric: imp_video
+  severity: high
+  status: red
+  keywords:
+  - imp
+  - impressions
+  - roi_floor
+  - creative_pool
+  diagnosis_template: Impressions giảm mạnh, ưu tiên chẩn đoán ROI floor, budget utilization
+    và creative pool theo Funnel Matrix.
+  action_templates:
+  - Hạ ROI floor 0.2 mỗi 2 ngày và theo dõi điều kiện dừng.
+  - Bổ sung creative pool với video mới, ưu tiên video creator.
+  - Kiểm tra Spend/Budget utilization để xác nhận hệ thống bị throttle.
+  owner_default: SaoBT + CEO
+  sla_hours: 8
+  priority: P1
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: 4. Tăng Impressions
+    section: 7 Đòn bẩy tăng impressions
+- id: KB-HEC-CONSIDERATION-001
+  metric: ctr
+  severity: high
+  status: red
+  keywords:
+  - ctr
+  - rate_6s
+  - cpc
+  - consideration
+  diagnosis_template: CTR tầng consideration thấp cần đọc cùng Rate 6s và CPC để tránh
+    tối ưu sai lớp.
+  action_templates:
+  - Giữ body winner, refresh hook và CTA để tăng tỷ lệ nhấp.
+  - Tắt video hạng D khi đã đủ sample size, dồn ngân sách cho hạng S/A.
+  - Nếu CTR cao nhưng clicks thấp, ưu tiên xử lý ROI floor thay vì sửa video.
+  owner_default: SaoBT + TuND
+  sla_hours: 8
+  priority: P1
+  source:
+    file: /Users/admin/Downloads/Hecatech_Funnel_Matrix_v12 30_3.xlsx
+    sheet: 5. Lọc video Consideration
+    section: Quick filtering + diagnosis
+- id: KB-FM12-001
+  metric: orders
+  severity: high
+  status: red
+  keywords:
+  - orders
+  - don
+  - t3 tổng hợp
+  diagnosis_template: 'Số đơn/ngày (Orders): kiểm tra theo Funnel Matrix v12. Nhóm
+    yếu tố ảnh hưởng ưu tiên: Impressions × CTR × CVR | ROI floor | Live | AFF'
+  action_templates:
+  - North Star VOLUME. Đơn giảm 3 ngày → check ROI floor + creative pool
+  owner_default: SaoBT + CEO
+  sla_hours: 8
+  priority: P1
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3: Tổng hợp'
+    thresholds_pct: —
+    thresholds_abs: 🔴<200 🟡200-400 ✅>400 đơn/ngày
+- id: KB-FM12-002
+  metric: revenue
+  severity: high
+  status: red
+  keywords:
+  - revenue
+  - doanh_so
+  - t3 tổng hợp
+  diagnosis_template: 'Doanh số/ngày (Revenue): kiểm tra theo Funnel Matrix v12. Nhóm
+    yếu tố ảnh hưởng ưu tiên: Số đơn × AOV | DS Ads + Live + AFF + Organic'
+  action_templates:
+  - Tách DS theo kênh hàng tuần.
+  - 1 kênh >70% = 🔴 rủi ro tập trung.
+  - 'KTMR: Paid ~80%, Live ~20%.'
+  owner_default: SaoBT + CEO
+  sla_hours: 8
+  priority: P1
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3: Tổng hợp'
+    thresholds_pct: '1 kênh >70%=🔴
+
+      60-70%=🟡
+
+      <60%=✅'
+    thresholds_abs: 🔴<40M 🟡40-80M ✅>80M/ngày
+- id: KB-FM12-003
+  metric: aov
+  severity: high
+  status: red
+  keywords:
+  - aov
+  - t3 tổng hợp
+  diagnosis_template: 'AOV: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng
+    ưu tiên: Giá SP | Combo | Voucher | Product mix'
+  action_templates:
+  - 'KTMR: single 98% DS. Combo 1.5-3.5%.'
+  owner_default: SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3: Tổng hợp'
+    thresholds_pct: —
+    thresholds_abs: 'KTMR: 160-179K'
+- id: KB-FM12-004
+  metric: cpa
+  severity: high
+  status: red
+  keywords:
+  - cpa
+  - cost_per_acquisition
+  - t3 tổng hợp
+  diagnosis_template: 'CPA đơn thực
+
+    (Chi phí/đơn hoàn thành): kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh hưởng
+    ưu tiên: Tổng hợp 3 tầng | ROI floor'
+  action_templates:
+  - 🔴>70K = CẢNH BÁO (review ngay, KHÔNG dừng hạ floor vì 1 ngày).
+  - Stop-loss = >70K × 3 ngày liền → dừng hạ floor.
+  owner_default: SaoBT + CEO
+  sla_hours: 8
+  priority: P1
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3: Tổng hợp'
+    thresholds_pct: 🔴>70K 🟡55-70K ✅<55K
+    thresholds_abs: '⚠️ CPA TTMS 274 VND ≠ đơn thực!
+
+      "Kết quả" TTMS có thể = view content.
+
+      Đơn thực 25/03 = ~81.'
+- id: KB-FM12-005
+  metric: impressions
+  severity: high
+  status: red
+  keywords:
+  - impressions
+  - imp
+  - video_impressions
+  - t3a video
+  diagnosis_template: 'Impressions VIDEO: kiểm tra theo Funnel Matrix v12. Nhóm yếu
+    tố ảnh hưởng ưu tiên: ① ROI floor ② Budget utilization ③ Creative pool ④ Video
+    freshness ⑤ Learning phase ⑥ Audience saturation ⑦ Competition'
+  action_templates:
+  - Hạ ROI floor (rule 3 stop).
+  - Check utilization.
+  - Bổ sung creative 30-40 video/ngày.
+  owner_default: SaoBT + CEO
+  sla_hours: 8
+  priority: P1
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3A: Video'
+    thresholds_pct: —
+    thresholds_abs: '🔴<50K 🟡50-150K ✅>150K/ngày
+
+      Utilization: 🔴<50% ✅>80%'
+- id: KB-FM12-006
+  metric: ctr
+  severity: high
+  status: red
+  keywords:
+  - ctr
+  - click
+  - video_ctr
+  - t3a video
+  diagnosis_template: 'CTR VIDEO: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: Rate 6s | Hook | Format | CTA | Product tag timing | Nguồn Creator
+    vs Tự làm'
+  action_templates:
+  - Sort Rate 6s hàng ngày. Tắt hạng D.
+  - Refresh hook. Ưu tiên Creator.
+  owner_default: SaoBT + TuND
+  sla_hours: 24
+  priority: P2
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3A: Video'
+    thresholds_pct: '🔴<1% 🟡1-5% ✅>5%
+
+      (video-level)'
+    thresholds_abs: Kèm Clicks tuyệt đối
+- id: KB-FM12-007
+  metric: cvr
+  severity: high
+  status: red
+  keywords:
+  - cvr
+  - conversion
+  - video_cvr
+  - t3a video
+  diagnosis_template: 'CVR VIDEO: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: ① CTA trong video ② Demo kết quả/B&A (giây 6+) ③ Show giá/deal
+    ④ Product tag timing ⑤ Testimonial ⑥ Match video↔listing ⑦ Format'
+  action_templates:
+  - Audit CTA top 10 video.
+  - Test product tag timing.
+  - 'Checklist: mọi video PHẢI có demo.'
+  - CTR>2% + CVR<0.3% = video giải trí.
+  owner_default: TuND + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3A: Video'
+    thresholds_pct: 'CTR>2% mà CVR<0.3%
+
+      = 🔴 video giải trí'
+    thresholds_abs: '% video có CTA:
+
+      🔴<50% 🟡50-80% ✅>80%'
+- id: KB-FM12-008
+  metric: impressions
+  severity: high
+  status: red
+  keywords:
+  - impressions
+  - imp
+  - card_impressions
+  - t3b thẻ sp
+  diagnosis_template: 'Impressions THẺ SP: kiểm tra theo Funnel Matrix v12. Nhóm yếu
+    tố ảnh hưởng ưu tiên: ① SEO title/keyword ② Rating ★ ③ Số review ④ SES Score ⑤
+    Danh mục ⑥ Số đơn đã bán ⑦ Search volume'
+  action_templates:
+  - Audit SEO vs đối thủ. Tăng review. Fix rating. Check SES.
+  owner_default: Ops + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3B: Thẻ SP'
+    thresholds_pct: 'Rating 🔴<4.3★ ✅>4.6★
+
+      SES 🔴<3.5 ✅>4.5'
+    thresholds_abs: Review 🔴<100 ✅>500
+- id: KB-FM12-009
+  metric: ctr
+  severity: high
+  status: red
+  keywords:
+  - ctr
+  - click
+  - card_ctr
+  - t3b thẻ sp
+  diagnosis_template: 'CTR THẺ SP: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: ① Ảnh chính ② Giá vs đối thủ ③ Badge (Bestseller/Flash Sale) ④
+    Tiêu đề ⑤ % giảm giá ⑥ Số đã bán'
+  action_templates:
+  - Audit ảnh vs đối thủ. So giá. Đăng ký badge.
+  owner_default: Ops + Marketing
+  sla_hours: 24
+  priority: P2
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3B: Thẻ SP'
+    thresholds_pct: So CTR thẻ vs đối thủ
+    thresholds_abs: —
+- id: KB-FM12-010
+  metric: cvr
+  severity: high
+  status: red
+  keywords:
+  - cvr
+  - conversion
+  - card_cvr
+  - t3b thẻ sp
+  diagnosis_template: 'CVR THẺ SP: kiểm tra theo Funnel Matrix v12. Nhóm yếu tố ảnh
+    hưởng ưu tiên: ① Ảnh chi tiết + video listing ② Mô tả SP ③ Rating + review ④ Đổi
+    trả ⑤ Giao hàng ⑥ Combo ⑦ Q&A ⑧ Live replay'
+  action_templates:
+  - Audit listing vs đối thủ. Video demo trong listing. Trả lời Q&A <2h.
+  - KTMR CVR thẻ 6.3-7.3% = ổn → KHÔNG phải vấn đề chính.
+  owner_default: Ops + SaoBT
+  sla_hours: 24
+  priority: P2
+  source:
+    file: Hecatech_Funnel_Matrix_v12
+    sheet: 1. Ma trận tổng quan
+    funnel: 'T3B: Thẻ SP'
+    thresholds_pct: 'Product card CVR:
+
+      🔴<3% 🟡3-6% ✅>6%'
+    thresholds_abs: 'KTMR: 6.3-7.3% = ✅'

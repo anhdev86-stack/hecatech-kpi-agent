@@ -1,0 +1,10 @@
+.env
+*.pyc
+__pycache__/
+.venv/
+data/alert_log.jsonl
+data/daily_snapshots.json
+data/kpi_main_downloaded.xlsx
+data/kpi_main_from_sheet.xlsx
+logs/
+*.egg-info/

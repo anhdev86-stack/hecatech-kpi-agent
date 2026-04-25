@@ -1,0 +1,43 @@
+default:
+  metric_col: metric
+  actual_col: actual_value
+  mtd_col: mtd_value
+  prev_col: prev_value        # cột giá trị ngày hôm trước (để tính drop%)
+
+  # Chỉ số cảnh báo chính
+  benchmarks:
+    revenue:     0            # doanh số – dùng để phát hiện giảm
+    impressions: 10000        # lượt hiển thị benchmark
+    ctr:         0.015        # Click-Through Rate benchmark (1.5%)
+    cvr:         0.03         # Conversion Rate benchmark (3%)
+    cpm:         5.0          # Cost Per Mille benchmark ($5)
+    cpa:         20.0         # Cost Per Acquisition benchmark ($20)
+    profit:      1000
+    margin:      0.2
+
+  thresholds:
+    revenue:     0            # ngưỡng cứng – dưới 0 là critical
+    impressions: 5000         # ngưỡng đỏ impressions
+    ctr:         0.008        # ngưỡng đỏ CTR (0.8%)
+    cvr:         0.015        # ngưỡng đỏ CVR (1.5%)
+    cpm:         10.0         # ngưỡng đỏ CPM ($10)
+    cpa:         40.0         # ngưỡng đỏ CPA ($40)
+    profit:      0
+    margin:      0.1
+
+  # Ngưỡng drop doanh số kích hoạt cảnh báo khẩn
+  revenue_drop_alert_pct: 0.20   # giảm >20% so với ngày hôm trước
+
+projects:
+  XKMVN: {}
+  KTLVN: {}
+  KTLTL: {}
+  TDCVN: {}
+  KTMR: {}
+  SRMR: {}
+  XKMTL: {}
+  KTMVN: {}
+  MNVN: {}
+  XKMPH: {}
+  XKMMY: {}
+  XKMUS: {}

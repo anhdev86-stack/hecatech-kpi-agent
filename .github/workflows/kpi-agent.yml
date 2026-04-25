@@ -1,0 +1,53 @@
+name: KPI Agent Scheduled Report
+
+on:
+  schedule:
+    # 10:00 Bangkok = 03:00 UTC
+    - cron: '0 3 * * *'
+    # 16:00 Bangkok = 09:00 UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:  # Cho phép chạy thủ công từ GitHub UI
+
+env:
+  TZ: Asia/Bangkok
+
+jobs:
+  run-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Determine report scope
+        id: scope
+        run: |
+          HOUR=$(TZ=Asia/Bangkok date +%H)
+          if [ "$HOUR" -lt 12 ]; then
+            echo "scope=morning" >> $GITHUB_OUTPUT
+            echo "Running morning report (yesterday's data)"
+          else
+            echo "scope=afternoon" >> $GITHUB_OUTPUT
+            echo "Running afternoon report (today's data)"
+          fi
+
+      - name: Run KPI Agent
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-5.5' }}
+          KPI_SOURCE: ${{ secrets.KPI_SOURCE }}
+        run: |
+          python src/main.py run \
+            --scope ${{ steps.scope.outputs.scope }} \
+            --use-llm \
+            --kpi-source "$KPI_SOURCE"
