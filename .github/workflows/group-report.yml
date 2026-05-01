@@ -1,0 +1,29 @@
+name: Group Report (every 3 days)
+
+on:
+  schedule:
+    # Chạy 3 ngày 1 lần lúc 10:00 AM Bangkok (UTC+7) = 03:00 UTC
+    # Ngày 1, 4, 7, 10, 13, 16, 19, 22, 25, 28 mỗi tháng
+    - cron: '0 3 1,4,7,10,13,16,19,22,25,28 * *'
+  workflow_dispatch:
+
+env:
+  TZ: Asia/Bangkok
+
+jobs:
+  group-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Group Report (all projects, 3-day data)
+        run: |
+          echo "🕐 Bangkok time: $(TZ=Asia/Bangkok date)"
+          echo "📊 Group Report — báo chỉ số 3 ngày gần nhất"
+          python run_project_report.py

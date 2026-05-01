@@ -1,0 +1,58 @@
+name: CEO Report (2x daily)
+
+on:
+  schedule:
+    # 10:00 AM Bangkok (UTC+7) = 03:00 UTC
+    - cron: '0 3 * * *'
+    # 16:00 PM Bangkok (UTC+7) = 09:00 UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Report mode (morning/afternoon)'
+        required: true
+        default: 'morning'
+        type: choice
+        options:
+          - morning
+          - afternoon
+
+env:
+  TZ: Asia/Bangkok
+
+jobs:
+  ceo-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install anthropic
+
+      - name: Determine report mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(TZ=Asia/Bangkok date +%H)
+            if [ "$HOUR" -lt 12 ]; then
+              echo "mode=morning" >> $GITHUB_OUTPUT
+            else
+              echo "mode=afternoon" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run CEO Report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "🕐 Bangkok time: $(TZ=Asia/Bangkok date)"
+          echo "📊 Mode: ${{ steps.mode.outputs.mode }}"
+          python run_ai_report.py ${{ steps.mode.outputs.mode }}
