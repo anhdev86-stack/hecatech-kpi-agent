@@ -1,0 +1,186 @@
+{
+  "name": "Hecatech - WEBHOOK Lark Interactive",
+  "nodes": [
+    {
+      "id": "hook-001",
+      "name": "Lark Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "hecatech-lark-events",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lark-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "hook-002",
+      "name": "Parse Lark Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// WEBHOOK: LARK INTERACTIVE Q&A\n// Triggered when employee @mentions the bot in any Lark group\n// ============================================================\n\nconst body = $input.first().json.body || $input.first().json;\n\n// --- Handle Lark URL verification (first-time setup) ---\nif (body.type === 'url_verification') {\n  return [{ json: { action: 'verify', challenge: body.challenge } }];\n}\n\n// --- Parse message event ---\nconst event = body.event || body;\nconst chatId  = event.message?.chat_id || '';\nconst msgId   = event.message?.message_id || '';\nconst senderId = event.sender?.sender_id?.user_id || '';\n\n// Extract text (Lark content is JSON string)\nlet rawText = '';\ntry {\n  const content = JSON.parse(event.message?.content || '{}');\n  rawText = content.text || content.content || '';\n} catch (e) {\n  rawText = String(event.message?.content || '');\n}\n\n// Remove @mention and clean up\nconst question = rawText.replace(/@[\\w\\u00C0-\\u024F\\u4e00-\\u9fa5\\u00C0-\\u017E]+/gu, '').trim();\n\nif (!question) {\n  return [{ json: { action: 'skip', reason: 'empty question' } }];\n}\n\n// --- Detect which project the question is about ---\nconst projectMap = {\n  XKMVN: { keywords: ['xkm', 'xịt', 'khử mùi', 'xkmvn'],         name: 'Xịt Khử Mùi VN',  sheet: 'XKMVN' },\n  KTLVN: { keywords: ['ktl', 'ktlvn', 'ktl vn'],                   name: 'KTL Vietnam',       sheet: 'KTLVN' },\n  TDCVN: { keywords: ['tdc', 'tdcvn'],                             name: 'TDC Vietnam',       sheet: 'TDCVN' },\n  KTMVN: { keywords: ['ktmvn', 'ktm vn', 'ktm việt'],             name: 'KTM Vietnam',       sheet: 'KTMVN' },\n  MNVN:  { keywords: ['mnvn', 'mn vn'],                            name: 'MN Vietnam',        sheet: 'MNVN'  },\n  KTMR:  { keywords: ['ktmr', 'ktm market'],                       name: 'KTM Market',        sheet: 'KTMR'  },\n  SRMR:  { keywords: ['srmr', 'sr market'],                        name: 'SR Market',         sheet: 'SRMR'  },\n  KTLTL: { keywords: ['ktltl', 'ktl thai', 'thái', 'thailand'],   name: 'KTL Thailand',      sheet: 'KTLTL' },\n  XKMTL: { keywords: ['xkmtl', 'xkm thai', 'xkm thái'],          name: 'XKM Thailand',      sheet: 'XKMTL' },\n  XKMPH: { keywords: ['xkmph', 'philippines', 'phil', 'ph'],       name: 'XKM Philippines',   sheet: 'XKMPH' },\n  XKMMY: { keywords: ['xkmmy', 'malaysia', 'malay', 'my'],        name: 'XKM Malaysia',      sheet: 'XKMMY' }\n};\n\nconst lowerQ = question.toLowerCase();\nlet detectedProject = null;\n\nfor (const [id, cfg] of Object.entries(projectMap)) {\n  if (cfg.keywords.some(kw => lowerQ.includes(kw))) {\n    detectedProject = { id, ...cfg };\n    break;\n  }\n}\n\n// Default: use Tổng hợp sheet if no specific project detected\nif (!detectedProject) {\n  detectedProject = { id: 'TONG_HOP', name: 'Tổng hợp', sheet: 'Tổng hợp' };\n}\n\nreturn [{\n  json: {\n    action: 'reply',\n    question,\n    project: detectedProject,\n    chatId,\n    msgId,\n    senderId\n  }\n}];"
+      }
+    },
+    {
+      "id": "hook-003",
+      "name": "Route Verify vs Reply",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [
+                  {
+                    "id": "cond-verify",
+                    "leftValue": "={{$json.action}}",
+                    "rightValue": "verify",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "outputKey": "0"
+            },
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [
+                  {
+                    "id": "cond-reply",
+                    "leftValue": "={{$json.action}}",
+                    "rightValue": "reply",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ]
+              },
+              "outputKey": "1"
+            }
+          ]
+        },
+        "fallbackOutput": "none"
+      }
+    },
+    {
+      "id": "hook-004",
+      "name": "Respond Verify Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [920, 160],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify({challenge: $json.challenge})}}",
+        "options": {}
+      }
+    },
+    {
+      "id": "hook-005",
+      "name": "Read Project Sheet for Q&A",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [920, 440],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "={{$json.project.sheet}}", "mode": "name" },
+        "options": { "headerRow": false, "range": "A1:AK50" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "hook-006",
+      "name": "Build QA Context for Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 440],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const parsedEvent = $('Parse Lark Event').first().json;\nconst sheetItems = $input.all();\n\nconst col = (item, idx) => {\n  const obj = item.json || item;\n  const keys = Object.keys(obj);\n  return obj[keys[idx]];\n};\nconst fmtSmart = (name, n) => {\n  n = parseFloat(n) || 0;\n  const isRatio = /tỷ lệ|margin|rate|cp\\//i.test(name);\n  if (isRatio) return (n*100).toFixed(1)+'%';\n  if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(2)+' tỷ';\n  if (Math.abs(n) >= 1e6) return Math.round(n/1e6)+' tr';\n  return n.toLocaleString('vi-VN');\n};\n\nconst today = new Date();\nconst yesterdayColIdx = 5 + today.getDate() - 1;\n\n// Build metric context from sheet\nconst contextData = {};\nsheetItems.forEach(item => {\n  const name = (col(item, 0) || '').toString().trim();\n  if (!name || name.length < 3) return;\n  const mtd  = parseFloat(col(item, 5)) || 0;\n  const yday = parseFloat(col(item, yesterdayColIdx)) || 0;\n  const bm   = (col(item, 1) || '').toString();\n  if (mtd !== 0 || yday !== 0) {\n    contextData[name] = {\n      mtd:       fmtSmart(name, mtd),\n      yesterday: fmtSmart(name, yday),\n      benchmark: bm\n    };\n  }\n});\n\nconst project = parsedEvent.project;\nconst question = parsedEvent.question;\n\nconst systemPrompt = `Bạn là AI phân tích kinh doanh của Hecatech, chuyên dự án ${project.name}.\nTrả lời câu hỏi của nhân viên dựa trên data dashboard thực tế.\nViết tiếng Việt, súc tích, có số liệu cụ thể, đề xuất hành động khi cần.\nNếu câu hỏi ngoài phạm vi kinh doanh/data, từ chối lịch sự trong 1 câu.`;\n\nconst userPrompt = `Câu hỏi: \"${question}\"\nDự án: ${project.name}\nData hiện tại (MTD và hôm qua):\n${JSON.stringify(contextData, null, 2)}\n\nTrả lời ngắn gọn dưới 180 từ. Dẫn số liệu thực tế nếu liên quan.`;\n\nreturn [{\n  json: {\n    parsedEvent,\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 500,\n      system: systemPrompt,\n      messages: [{ role: 'user', content: userPrompt }]\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "hook-007",
+      "name": "Claude QA Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 440],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{$vars.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.claudeRequest)}}"
+      }
+    },
+    {
+      "id": "hook-008",
+      "name": "Reply in Lark Thread",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 440],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://open.larksuite.com/open-apis/im/v1/messages/{{$('Build QA Context for Claude').first().json.parsedEvent.msgId}}/reply",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer ={{$vars.LARK_BOT_TOKEN}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\"msg_type\":\"text\",\"content\":{\"text\":\"{{$json.content[0].text}}\"}}"
+      }
+    },
+    {
+      "id": "hook-009",
+      "name": "Respond 200 to Lark",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1880, 440],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"code\": 0}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Lark Event Webhook":         { "main": [[{ "node": "Parse Lark Event",            "type": "main", "index": 0 }]] },
+    "Parse Lark Event":           { "main": [[{ "node": "Route Verify vs Reply",        "type": "main", "index": 0 }]] },
+    "Route Verify vs Reply": {
+      "main": [
+        [{ "node": "Respond Verify Challenge",    "type": "main", "index": 0 }],
+        [{ "node": "Read Project Sheet for Q&A",  "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Project Sheet for Q&A": { "main": [[{ "node": "Build QA Context for Claude", "type": "main", "index": 0 }]] },
+    "Build QA Context for Claude":{ "main": [[{ "node": "Claude QA Response",           "type": "main", "index": 0 }]] },
+    "Claude QA Response":         { "main": [[{ "node": "Reply in Lark Thread",          "type": "main", "index": 0 }]] },
+    "Reply in Lark Thread":       { "main": [[{ "node": "Respond 200 to Lark",           "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}

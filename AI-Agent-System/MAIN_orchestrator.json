@@ -1,0 +1,159 @@
+{
+  "name": "Hecatech - MAIN Orchestrator",
+  "nodes": [
+    {
+      "id": "main-0001",
+      "name": "Schedule 7AM Mon-Sat",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * 1-6" }]
+        }
+      }
+    },
+    {
+      "id": "main-0002",
+      "name": "Read Bao Cao Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Báo cáo", "mode": "name" },
+        "options": { "headerRow": false }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "main-0003",
+      "name": "Read Tong Hop Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Tổng hợp", "mode": "name" },
+        "options": { "headerRow": false, "range": "A1:AG60" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "main-0004",
+      "name": "Transform Dashboard Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// HECATECH MAIN ORCHESTRATOR — Data Transform\n// Reads both sheets, builds full package for sub-workflows\n// ============================================================\n\nconst baoCaoItems = $('Read Bao Cao Sheet').all();\nconst tongHopItems = $input.all(); // Tổng hợp is last node output\n\n// --- Helpers ---\nconst col = (row, idx) => { const keys = Object.keys(row.json||row); return (row.json||row)[keys[idx]]; };\nconst fmt = (n) => {\n  n = parseFloat(n) || 0;\n  if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(2) + ' tỷ';\n  if (Math.abs(n) >= 1e6) return Math.round(n/1e6) + ' tr';\n  return Math.round(n).toLocaleString('vi-VN');\n};\n\n// --- Extract Báo cáo ---\nconst headerRow = baoCaoItems[0]?.json || {};\nconst rawDate = col({ json: headerRow }, 0);\nconst reportDate = rawDate\n  ? new Date(rawDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })\n  : new Date().toLocaleDateString('vi-VN');\n\nconst projects = [];\nfor (let i = 1; i < baoCaoItems.length; i++) {\n  const r = baoCaoItems[i].json;\n  const name = (col({ json: r }, 0) || '').toString().trim();\n  if (!name || name === 'NaN' || name.length < 2) continue;\n  const doanhSo  = parseFloat(col({ json: r }, 1)) || 0;\n  const doanhThu = parseFloat(col({ json: r }, 2)) || 0;\n  const chiPhi   = parseFloat(col({ json: r }, 4)) || 0;\n  const loiNhuan = parseFloat(col({ json: r }, 5)) || 0;\n  const redThr   = parseFloat(col({ json: r }, 6)) || 0;\n  const greenThr = parseFloat(col({ json: r }, 7)) || 0;\n  const status   = (col({ json: r }, 8) || '🔴').toString().trim();\n  projects.push({\n    name, status,\n    doanhSo: fmt(doanhSo), doanhThu: fmt(doanhThu),\n    chiPhi: fmt(chiPhi),   loiNhuan: fmt(loiNhuan),\n    loiNhuan_raw: loiNhuan, doanhSo_raw: doanhSo,\n    margin: doanhThu > 0 ? (loiNhuan/doanhThu*100).toFixed(1)+'%' : 'N/A',\n    cpds:   doanhSo  > 0 ? (chiPhi/doanhSo*100).toFixed(1)+'%'   : 'N/A',\n    target: fmt(redThr) + ' → ' + fmt(greenThr)\n  });\n}\n\n// --- Extract Tổng hợp MTD ---\nconst metrics = {};\nconst today = new Date();\nconst yesterdayColIdx = 5 + today.getDate() - 1;\ntongHopItems.forEach(item => {\n  const name = (col(item, 0) || '').toString().trim();\n  if (name && name !== 'NaN') {\n    metrics[name] = {\n      mtd: parseFloat(col(item, 5)) || 0,\n      yesterday: parseFloat(col(item, yesterdayColIdx)) || 0\n    };\n  }\n});\n\n// --- Build dashboard summary ---\nconst red    = projects.filter(p => p.status === '🔴');\nconst yellow = projects.filter(p => p.status === '🟡');\nconst green  = projects.filter(p => p.status === '✅');\nconst totalDS = projects.reduce((s, p) => s + p.doanhSo_raw, 0);\nconst totalLN = projects.reduce((s, p) => s + p.loiNhuan_raw, 0);\n\nconst dashboardData = {\n  reportDate,\n  summary: {\n    green: green.length, yellow: yellow.length, red: red.length,\n    totalDoanhSo: fmt(totalDS), totalLoiNhuan: fmt(totalLN),\n    overallMargin: totalDS > 0 ? (totalLN/totalDS*100).toFixed(1)+'%' : '0%'\n  },\n  tiktokMTD: {\n    gmv:             fmt(metrics['Tổng GMV']?.mtd || 0),\n    loiNhuanRong:    fmt(metrics['★ LỢI NHUẬN RÒNG']?.mtd || 0),\n    netProfitMargin: ((metrics['Net Profit Margin']?.mtd || 0)*100).toFixed(1)+'%'\n  },\n  projects,\n  redProjects:    red.map(p => p.name),\n  yellowProjects: yellow.map(p => p.name),\n  greenProjects:  green.map(p => p.name)\n};\n\n// --- Project configs (sheet names + Lark webhooks) ---\n// Sub-workflows will read these to know where to send warnings\nconst projectConfigs = [\n  { id: 'XKMVN', name: 'Xịt Khử Mùi VN',  sheet: 'XKMVN', webhook: $vars.LARK_XKMVN_WEBHOOK, market: 'VN' },\n  { id: 'KTLVN', name: 'KTL Vietnam',       sheet: 'KTLVN', webhook: $vars.LARK_KTLVN_WEBHOOK, market: 'VN' },\n  { id: 'TDCVN', name: 'TDC Vietnam',       sheet: 'TDCVN', webhook: $vars.LARK_TDCVN_WEBHOOK, market: 'VN' },\n  { id: 'KTMVN', name: 'KTM Vietnam',       sheet: 'KTMVN', webhook: $vars.LARK_KTMVN_WEBHOOK, market: 'VN' },\n  { id: 'MNVN',  name: 'MN Vietnam',        sheet: 'MNVN',  webhook: $vars.LARK_MNVN_WEBHOOK,  market: 'VN' },\n  { id: 'KTMR',  name: 'KTM Market',        sheet: 'KTMR',  webhook: $vars.LARK_KTMR_WEBHOOK,  market: 'Multi' },\n  { id: 'SRMR',  name: 'SR Market',         sheet: 'SRMR',  webhook: $vars.LARK_SRMR_WEBHOOK,  market: 'Multi' },\n  { id: 'KTLTL', name: 'KTL Thailand',      sheet: 'KTLTL', webhook: $vars.LARK_KTLTL_WEBHOOK, market: 'TH' },\n  { id: 'XKMTL', name: 'XKM Thailand',      sheet: 'XKMTL', webhook: $vars.LARK_XKMTL_WEBHOOK, market: 'TH' },\n  { id: 'XKMPH', name: 'XKM Philippines',   sheet: 'XKMPH', webhook: $vars.LARK_XKMPH_WEBHOOK, market: 'PH' },\n  { id: 'XKMMY', name: 'XKM Malaysia',      sheet: 'XKMMY', webhook: $vars.LARK_XKMMY_WEBHOOK, market: 'MY' }\n];\n\n// --- Day flags (weekly agents only run on Monday) ---\nconst isMonday = today.getDay() === 1; // 0=Sun, 1=Mon\n\n// Return single item with full package — flows into sub-workflows\nreturn [{ json: { dashboardData, projectConfigs, isMonday } }];"
+      }
+    },
+    {
+      "id": "main-0005",
+      "name": "EXEC SUB CEO Briefing",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [1160, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "={{$vars.SUB_CEO_BRIEFING_ID}}",
+          "mode": "id"
+        },
+        "options": { "waitForSubWorkflow": true }
+      }
+    },
+    {
+      "id": "main-0006",
+      "name": "EXEC SUB All Project Warnings",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [1400, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{$vars.SUB_PROJECT_WARNINGS_ID}}", "mode": "id" },
+        "options": { "waitForSubWorkflow": true }
+      }
+    },
+    {
+      "id": "main-0007",
+      "name": "EXEC SUB Ads Optimizer",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [1640, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{$vars.SUB_ADS_OPTIMIZER_ID}}", "mode": "id" },
+        "options": { "waitForSubWorkflow": true }
+      }
+    },
+    {
+      "id": "main-0008",
+      "name": "EXEC SUB Review Management",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [1880, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{$vars.SUB_REVIEW_MGMT_ID}}", "mode": "id" },
+        "options": { "waitForSubWorkflow": true }
+      }
+    },
+    {
+      "id": "main-0010",
+      "name": "EXEC SUB Competitive Intel",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [2120, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{$vars.SUB_COMPETITIVE_INTEL_ID}}", "mode": "id" },
+        "options": { "waitForSubWorkflow": true }
+      }
+    },
+    {
+      "id": "main-0011",
+      "name": "EXEC SUB Content Production",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [2360, 300],
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "={{$vars.SUB_CONTENT_PRODUCTION_ID}}", "mode": "id" },
+        "options": { "waitForSubWorkflow": true }
+      }
+    },
+    {
+      "id": "main-0009",
+      "name": "All Agents Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2600, 300],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Schedule 7AM Mon-Sat":            { "main": [[{ "node": "Read Bao Cao Sheet",              "type": "main", "index": 0 }]] },
+    "Read Bao Cao Sheet":              { "main": [[{ "node": "Read Tong Hop Sheet",              "type": "main", "index": 0 }]] },
+    "Read Tong Hop Sheet":             { "main": [[{ "node": "Transform Dashboard Data",         "type": "main", "index": 0 }]] },
+    "Transform Dashboard Data":        { "main": [[{ "node": "EXEC SUB CEO Briefing",            "type": "main", "index": 0 }]] },
+    "EXEC SUB CEO Briefing":           { "main": [[{ "node": "EXEC SUB All Project Warnings",    "type": "main", "index": 0 }]] },
+    "EXEC SUB All Project Warnings":   { "main": [[{ "node": "EXEC SUB Ads Optimizer",           "type": "main", "index": 0 }]] },
+    "EXEC SUB Ads Optimizer":          { "main": [[{ "node": "EXEC SUB Review Management",       "type": "main", "index": 0 }]] },
+    "EXEC SUB Review Management":      { "main": [[{ "node": "EXEC SUB Competitive Intel",       "type": "main", "index": 0 }]] },
+    "EXEC SUB Competitive Intel":      { "main": [[{ "node": "EXEC SUB Content Production",      "type": "main", "index": 0 }]] },
+    "EXEC SUB Content Production":     { "main": [[{ "node": "All Agents Done",                  "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}

@@ -1,0 +1,148 @@
+{
+  "date": "2026-04-12",
+  "day_of_month": 12,
+  "days_in_month": 30,
+  "total_monthly_target_vnd": 58500000000,
+  "project_outputs": [
+    {
+      "project": "XKMVN",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 205000000, "status": "green", "vs_benchmark_daily": "+23%"},
+        "gmv_mtd": {"value": 2400000000, "target": 5000000000, "pct": 48, "pacing_status": "on_track"},
+        "net_profit_margin_mtd": {"value": 0.109, "status": "yellow"}
+      },
+      "warnings": [
+        {"priority": 1, "metric": "Take Rate", "value": "32.4%", "status": "red", "consecutive_days": 12, "owner": "SaoBT + CEO"},
+        {"priority": 2, "metric": "CPA", "value": "54.6K", "status": "yellow", "owner": "SaoBT + TuND"}
+      ],
+      "bright_spots": [{"metric": "AOV Live", "value": "243K", "note": "cao nhất 12 ngày"}]
+    },
+    {
+      "project": "KTMVN",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 178000000, "status": "yellow", "vs_benchmark_daily": "-8%"},
+        "gmv_mtd": {"value": 2080000000, "target": 4800000000, "pct": 43, "pacing_status": "on_track"},
+        "net_profit_margin_mtd": {"value": 0.118, "status": "yellow"}
+      },
+      "warnings": [
+        {"priority": 1, "metric": "Take Rate", "value": "31.2%", "status": "red", "consecutive_days": 6, "owner": "SaoBT"}
+      ]
+    },
+    {
+      "project": "KTLVN",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 232000000, "status": "green", "vs_benchmark_daily": "+45%"},
+        "gmv_mtd": {"value": 2650000000, "target": 4800000000, "pct": 55, "pacing_status": "ahead"},
+        "net_profit_margin_mtd": {"value": 0.145, "status": "green"}
+      },
+      "warnings": [],
+      "bright_spots": [
+        {"metric": "ROAS", "value": "3.8x", "note": "cao nhất trong các brand VN"},
+        {"metric": "Creative Fresh Rate", "value": "42%", "note": "Rate 6s trung bình >35%"}
+      ]
+    },
+    {
+      "project": "TDCVN",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 153000000, "status": "red", "vs_benchmark_daily": "-22%"},
+        "gmv_mtd": {"value": 1620000000, "target": 4200000000, "pct": 39, "pacing_status": "behind"},
+        "net_profit_margin_mtd": {"value": 0.072, "status": "red"}
+      },
+      "warnings": [
+        {"priority": 1, "metric": "Take Rate", "value": "33.8%", "status": "red", "consecutive_days": 10, "owner": "SaoBT + CEO"},
+        {"priority": 2, "metric": "Net Margin", "value": "7.2%", "status": "red", "owner": "CEO"}
+      ]
+    },
+    {
+      "project": "MNĐS",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 132000000, "status": "yellow"},
+        "gmv_mtd": {"value": 1350000000, "target": 4200000000, "pct": 32, "pacing_status": "behind"},
+        "net_profit_margin_mtd": {"value": 0.095, "status": "yellow"}
+      },
+      "warnings": [
+        {"priority": 1, "metric": "GMV MTD Pacing", "value": "32% ngày 12/30", "status": "red", "owner": "HoangNH + CEO"},
+        {"priority": 2, "metric": "Take Rate", "value": "30.5%", "status": "red", "consecutive_days": 4, "owner": "SaoBT"}
+      ]
+    },
+    {
+      "project": "KTMR",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 45000000, "status": "yellow", "note": "Malaysia mới ra mắt 3 tuần"},
+        "gmv_mtd": {"value": 480000000, "target": 1500000000, "pct": 32, "pacing_status": "behind"},
+        "net_profit_margin_mtd": {"value": 0.068, "status": "red"}
+      },
+      "warnings": [
+        {"priority": 1, "metric": "CPA", "value": "78K (MYR equiv)", "status": "red", "consecutive_days": 7, "owner": "SaoBT + CEO"}
+      ]
+    },
+    {
+      "project": "SRMR",
+      "date": "2026-04-12",
+      "summary": {"note": "no data - dự án có thể pause hoặc sheet delay"},
+      "warnings": [],
+      "data_missing": true
+    },
+    {
+      "project": "XKMPH",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 68000000, "status": "green", "note": "Philippines first week"},
+        "gmv_mtd": {"value": 420000000, "target": 1200000000, "pct": 35, "pacing_status": "on_track_for_launch"},
+        "net_profit_margin_mtd": {"value": 0.085, "status": "yellow"}
+      },
+      "warnings": [],
+      "bright_spots": [
+        {"metric": "ROAS", "value": "4.1x", "note": "first week launch — audience lookalike từ VN chuyển tốt"}
+      ]
+    },
+    {
+      "project": "KTLTL",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 95000000, "status": "yellow"},
+        "gmv_mtd": {"value": 1050000000, "target": 2800000000, "pct": 38, "pacing_status": "on_track"},
+        "net_profit_margin_mtd": {"value": 0.092, "status": "yellow"}
+      },
+      "warnings": [
+        {"priority": 1, "metric": "CTR Thailand", "value": "1.8%", "status": "yellow", "owner": "TuND"}
+      ]
+    },
+    {
+      "project": "XKMTL",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 78000000, "status": "yellow"},
+        "gmv_mtd": {"value": 920000000, "target": 2500000000, "pct": 37, "pacing_status": "on_track"},
+        "net_profit_margin_mtd": {"value": 0.101, "status": "yellow"}
+      },
+      "warnings": []
+    },
+    {
+      "project": "XKMMY",
+      "date": "2026-04-12",
+      "summary": {
+        "gmv_yesterday": {"value": 62000000, "status": "yellow"},
+        "gmv_mtd": {"value": 680000000, "target": 2000000000, "pct": 34, "pacing_status": "behind"},
+        "net_profit_margin_mtd": {"value": 0.088, "status": "yellow"}
+      },
+      "warnings": [
+        {"priority": 1, "metric": "GMV MTD Pacing", "value": "34% ngày 12/30", "status": "yellow", "owner": "SaoBT"}
+      ]
+    }
+  ],
+  "calendar_events_this_week": [
+    "15/04 (thứ 4): TikTok Shop 4.15 Sale — cần prep creative + budget push"
+  ],
+  "trend_summary_7d": {
+    "gmv_trend": "ổn định, giảm nhẹ 3% tuần này",
+    "take_rate_trend": "tăng từ 28.5% → 32.1% trong 7 ngày — đáng báo động",
+    "margin_trend": "giảm từ 10.8% → 9.4% MTD"
+  }
+}

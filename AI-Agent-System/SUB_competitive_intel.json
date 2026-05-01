@@ -1,0 +1,142 @@
+{
+  "name": "Hecatech - SUB Competitive Intelligence (Agent #2)",
+  "nodes": [
+    {
+      "id": "ci-001",
+      "name": "When Called by Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {}
+    },
+    {
+      "id": "ci-002",
+      "name": "Read Competitor Data Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.COMPETITOR_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Competitor Tracking", "mode": "name" },
+        "options": { "headerRow": true }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "ci-003",
+      "name": "Read Hecatech MTD Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 480],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Tổng hợp", "mode": "name" },
+        "options": { "headerRow": false, "range": "A1:AG20" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "ci-004",
+      "name": "Fetch Kalodata via HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 660],
+      "parameters": {
+        "method": "GET",
+        "url": "={{$vars.KALODATA_API_URL}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer ={{$vars.KALODATA_API_KEY}}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "category", "value": "beauty" },
+            { "name": "market",   "value": "vn" },
+            { "name": "period",   "value": "7d" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ci-005",
+      "name": "Analyze and Build Briefing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 420],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// AGENT #2 — COMPETITIVE INTELLIGENCE\n// So sánh Hecatech vs đối thủ: GMV, creative, giá, affiliate\n// Chạy mỗi thứ Hai, gửi briefing cho CEO + Leaders\n// ============================================================\n\n// Chỉ chạy vào thứ Hai — bỏ qua các ngày khác\nconst isMonday = new Date().getDay() === 1;\nif (!isMonday) {\n  return [{ json: { skipped: true, reason: 'Competitive Intel chỉ chạy thứ Hai' } }];\n}\n\nconst competitorRows = $('Read Competitor Data Sheet').all().map(i => i.json);\nconst hecatechRows   = $('Read Hecatech MTD Data').all();\nlet kalodata = {};\ntry { kalodata = $('Fetch Kalodata via HTTP').first()?.json || {}; } catch(e) {}\n\nconst today = new Date();\nconst weekStr = `Tuần ${Math.ceil(today.getDate()/7)} - Tháng ${today.getMonth()+1}/${today.getFullYear()}`;\n\n// Extract Hecatech MTD metrics\nconst col = (item, idx) => { const obj = item.json||item; return Object.values(obj)[idx]; };\nconst fmt = (n) => {\n  n = parseFloat(n) || 0;\n  if (Math.abs(n)>=1e9) return (n/1e9).toFixed(2)+' tỷ';\n  if (Math.abs(n)>=1e6) return Math.round(n/1e6)+' tr';\n  return n.toLocaleString('vi-VN');\n};\n\nconst hecatechMetrics = {};\nhecatechRows.forEach(item => {\n  const name = (col(item,0)||'').toString().trim();\n  if (name) hecatechMetrics[name] = parseFloat(col(item,5)) || 0;\n});\n\n// Organize competitor data by brand\nconst competitors = {};\ncompetitorRows.forEach(r => {\n  const brand = r['Brand'] || r['brand'] || 'Unknown';\n  if (!competitors[brand]) competitors[brand] = [];\n  competitors[brand].push(r);\n});\n\n// Build comparison data for Claude\nconst comparisonData = {\n  week: weekStr,\n  hecatech: {\n    gmv_mtd:    fmt(hecatechMetrics['Tổng GMV'] || 0),\n    revenue_mtd: fmt(hecatechMetrics['★ LỢI NHUẬN RÒNG'] || 0),\n    take_rate:   ((hecatechMetrics['Ads/DS (Take Rate)'] || 0)*100).toFixed(1)+'%'\n  },\n  competitors: Object.entries(competitors).map(([brand, data]) => ({\n    brand,\n    latestData: data[data.length - 1] || {}\n  })),\n  kalodata_top: Array.isArray(kalodata.data) ? kalodata.data.slice(0,5) : []\n};\n\nconst systemPrompt = `Bạn là chuyên gia phân tích cạnh tranh cho Hecatech — công ty TikTok commerce mỹ phẩm VN.\nNhiệm vụ: Tạo Competitive Intelligence Briefing tuần này.\nFocus: Beucare và Retolab là 2 brand chính của Hecatech. Đối thủ cạnh tranh chính trong ngành beauty TikTok VN.\nViết tiếng Việt, súc tích, tập trung insight có thể hành động được.`;\n\nconst userPrompt = `COMPETITIVE INTELLIGENCE BRIEFING — ${weekStr}\n\nData:\n${JSON.stringify(comparisonData, null, 2)}\n\nTạo báo cáo theo format:\n\n🔍 COMPETITIVE BRIEF — ${weekStr}\n\n📊 VỊ THẾ HECATECH TUẦN NÀY\n• GMV MTD: [số] vs đối thủ hàng đầu: [tên] [số]\n• Xu hướng: [tăng/giảm/ổn định]\n\n🔥 ĐỘNG THÁI ĐỐI THỦ ĐÁNG CHÚ Ý\n[Top 3 insight quan trọng nhất về đối thủ]\n\n📱 CREATIVE TREND TUẦN NÀY\n[2-3 xu hướng creative/hook đang winning trên TikTok beauty]\n\n💡 KHUYẾN NGHỊ CHO HECATECH\n1. [Hành động cụ thể để tận dụng cơ hội]\n2. [Hành động phòng thủ trước mối đe dọa]\n3. [Experiment cần test ngay tuần này]\n\n⚠️ RỦI RO CẦN THEO DÕI\n[1-2 điểm rủi ro từ thị trường/đối thủ]\n\nDưới 400 từ.`;\n\nreturn [{\n  json: {\n    comparisonData,\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 1200,\n      system: systemPrompt,\n      messages: [{ role: 'user', content: userPrompt }]\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "ci-006",
+      "name": "Claude Competitive Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{$vars.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.claudeRequest)}}"
+      }
+    },
+    {
+      "id": "ci-007",
+      "name": "Send to CEO and Leaders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 420],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const briefingText = $input.first().json?.content?.[0]?.text || '⚠️ Lỗi tạo báo cáo.';\nconst msg = { msg_type: 'text', content: { text: briefingText } };\n// Send to both CEO and Leaders group\nreturn [\n  { json: { url: $vars.LARK_CEO_WEBHOOK_URL,     larkMessage: msg } },\n  { json: { url: $vars.LARK_LEADERS_WEBHOOK_URL, larkMessage: msg } }\n];"
+      }
+    },
+    {
+      "id": "ci-008",
+      "name": "Send Briefing to Lark",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 420],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.url}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.larkMessage)}}"
+      }
+    }
+  ],
+  "connections": {
+    "When Called by Main":        { "main": [[{ "node": "Read Competitor Data Sheet", "type": "main", "index": 0 }, { "node": "Read Hecatech MTD Data", "type": "main", "index": 0 }, { "node": "Fetch Kalodata via HTTP", "type": "main", "index": 0 }]] },
+    "Read Competitor Data Sheet": { "main": [[{ "node": "Analyze and Build Briefing","type": "main", "index": 0 }]] },
+    "Read Hecatech MTD Data":     { "main": [[{ "node": "Analyze and Build Briefing","type": "main", "index": 0 }]] },
+    "Fetch Kalodata via HTTP":    { "main": [[{ "node": "Analyze and Build Briefing","type": "main", "index": 0 }]] },
+    "Analyze and Build Briefing": { "main": [[{ "node": "Claude Competitive Analysis","type": "main", "index": 0 }]] },
+    "Claude Competitive Analysis":{ "main": [[{ "node": "Send to CEO and Leaders",   "type": "main", "index": 0 }]] },
+    "Send to CEO and Leaders":    { "main": [[{ "node": "Send Briefing to Lark",      "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}

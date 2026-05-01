@@ -1,0 +1,86 @@
+{
+  "project": "XKMVN",
+  "project_name": "Xịt Khử Mùi Việt Nam",
+  "date": "2026-04-12",
+  "day_of_month": 12,
+  "days_in_month": 30,
+  "is_mega_day": false,
+  "has_live": true,
+  "has_affiliate": true,
+  "status": "scale",
+
+  "A_doanh_so": {
+    "tong_gmv": {"mtd": 2400000000, "d_1": 205000000, "d_2": 198000000},
+    "gmv_livestream": {"mtd": 672000000, "d_1": 58000000, "d_2": 55000000},
+    "gmv_video": {"mtd": 960000000, "d_1": 82000000, "d_2": 79000000},
+    "gmv_the_sp": {"mtd": 768000000, "d_1": 65000000, "d_2": 64000000},
+    "ty_le_live": {"mtd": 0.28, "d_1": 0.283, "d_2": 0.278},
+    "ty_le_video": {"mtd": 0.40, "d_1": 0.40, "d_2": 0.399},
+    "ty_le_the_sp": {"mtd": 0.32, "d_1": 0.317, "d_2": 0.323}
+  },
+
+  "B_livestream": {
+    "gmv_live": {"mtd": 672000000, "d_1": 58000000, "d_2": 55000000},
+    "so_don_live": {"mtd": 2800, "d_1": 239, "d_2": 228},
+    "aov_live": {"mtd": 240000, "d_1": 243000, "d_2": 241000},
+    "cp_ds_live": {"mtd": 0.29, "d_1": 0.285, "d_2": 0.292},
+    "so_gio_live": {"mtd": 340, "d_1": 28, "d_2": 29}
+  },
+
+  "C_ads": {
+    "gmv_ads": {"mtd": 1620000000, "d_1": 135000000, "d_2": 132000000},
+    "tong_don_ads": {"mtd": 8800, "d_1": 742, "d_2": 725},
+    "chi_phi_qc": {"mtd": 525000000, "d_1": 43800000, "d_2": 42500000},
+    "take_rate": {"mtd": 0.324, "d_1": 0.324, "d_2": 0.322},
+    "roas": {"mtd": 3.09, "d_1": 3.08, "d_2": 3.11},
+    "impressions": {"mtd": 7200000, "d_1": 620000, "d_2": 608000},
+    "ctr_qc": {"mtd": 0.0251, "d_1": 0.0249, "d_2": 0.0253},
+    "cvr_qc": {"mtd": 0.061, "d_1": 0.0615, "d_2": 0.0612},
+    "cpm": {"mtd": 72900, "d_1": 70645, "d_2": 69900},
+    "cpa": {"mtd": 53000, "d_1": 54600, "d_2": 52500}
+  },
+
+  "D_product_card": {
+    "imp_the_sp": {"mtd": 620000, "d_1": 53000, "d_2": 51000},
+    "ctr_the_sp": {"mtd": 0.014, "d_1": 0.0138, "d_2": 0.0141},
+    "cvr_the_sp": {"mtd": 0.552, "d_1": 0.548, "d_2": 0.561}
+  },
+
+  "E_affiliate": {
+    "ds_booking": {"mtd": 220000000, "d_1": 18500000, "d_2": 17200000},
+    "creator_active": {"mtd": 340, "d_1": 342, "d_2": 338},
+    "aff_video_gmv": {"mtd": 780000000, "d_1": 66000000, "d_2": 63500000}
+  },
+
+  "F_van_hanh": {
+    "ty_le_huy": {"mtd": 0.083, "d_1": 0.089, "d_2": 0.081},
+    "ty_le_hoan": {"mtd": 0.038, "d_1": 0.041, "d_2": 0.036}
+  },
+
+  "G_pl": {
+    "tong_doanh_so": {"mtd": 2400000000, "d_1": 205000000, "d_2": 198000000},
+    "ds_don_giao": {"mtd": 2200000000, "d_1": 187000000, "d_2": 182000000},
+    "voucher_tiktok": {"mtd": 216000000, "d_1": 19000000, "d_2": 17500000, "pct_mtd": 0.090},
+    "gia_von": {"mtd": 262000000, "d_1": 22800000, "d_2": 21500000, "pct_mtd": 0.109},
+    "tong_cp_ban_hang": {"mtd": 150000000},
+    "chi_phi_qc": {"mtd": 525000000},
+    "tong_cp_van_hanh": {"mtd": 1086000000},
+    "loi_nhuan_rong": {"mtd": 261000000, "d_1": 18000000, "d_2": 23500000},
+    "net_profit_margin": {"mtd": 0.109, "d_1": 0.088, "d_2": 0.119}
+  },
+
+  "trend_flags": {
+    "take_rate_red_streak_days": 12,
+    "cpa_trend_last_3_days": "rising",
+    "margin_below_10_last_days": 1
+  },
+
+  "owners": {
+    "ads": "SaoBT",
+    "content": "TuND",
+    "ops": "NgocNT",
+    "live": "LinhDTH",
+    "booking": "MaiDN",
+    "affiliate_video": "HoangNH"
+  }
+}

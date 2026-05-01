@@ -1,0 +1,292 @@
+{
+  "name": "Hecatech CEO Agent — Morning Briefing (XKMVN)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every morning 9:00 AM (Vietnam)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Chạy 9:00 AM mỗi ngày — sau khi TikTok/Shopee reconcile data hôm trước"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.DASHBOARD_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "XKMVN",
+          "mode": "name"
+        },
+        "options": {
+          "returnFirstMatch": false
+        }
+      },
+      "id": "read-dashboard",
+      "name": "Read Dashboard XKMVN",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [460, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Hecatech Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.BENCHMARK_CONFIG_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "benchmark_config",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "project",
+              "lookupValue": "XKMVN"
+            }
+          ]
+        }
+      },
+      "id": "read-benchmark",
+      "name": "Read Benchmark Config",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [460, 400],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Hecatech Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check kill switch\nconst benchmarkRows = $input.all().map(i => i.json);\nconst killSwitch = benchmarkRows.find(r => r.metric === 'agent_paused');\nif (killSwitch && String(killSwitch.benchmark_daily_green).toLowerCase() === 'true') {\n  return [{ json: { skip: true, reason: 'agent_paused = true in config' } }];\n}\n\n// Build data JSON từ Dashboard sheet (giả sử sheet có cột: metric_group, metric, mtd, d_1, d_2)\n// LƯU Ý: Cấu trúc sheet thực tế có thể khác — cần map lại theo sheet của Hecatech\nconst dashboardRows = $('Read Dashboard XKMVN').all().map(i => i.json);\n\nfunction findMetric(group, metric) {\n  const row = dashboardRows.find(r => r.metric_group === group && r.metric === metric);\n  return row ? { mtd: Number(row.mtd), d_1: Number(row.d_1), d_2: Number(row.d_2) } : null;\n}\n\nconst today = new Date();\nconst yesterday = new Date(today.getTime() - 86400000);\nconst dateStr = yesterday.toISOString().slice(0, 10);\nconst dayOfMonth = yesterday.getDate();\nconst daysInMonth = new Date(yesterday.getFullYear(), yesterday.getMonth() + 1, 0).getDate();\n\nconst metaRows = benchmarkRows.filter(r => r.metric_group === '_META');\nconst meta = Object.fromEntries(metaRows.map(r => [r.metric, r.benchmark_daily_green]));\n\nconst data = {\n  project: 'XKMVN',\n  date: dateStr,\n  day_of_month: dayOfMonth,\n  days_in_month: daysInMonth,\n  is_mega_day: false,  // TODO: đọc từ sheet lịch sự kiện\n  has_live: String(meta.has_live).toUpperCase() === 'TRUE',\n  has_affiliate: String(meta.has_affiliate).toUpperCase() === 'TRUE',\n  status: meta.status || 'scale',\n  A_doanh_so: {\n    tong_gmv: findMetric('A. Doanh số', 'Tổng GMV'),\n    gmv_livestream: findMetric('A. Doanh số', 'GMV Livestream'),\n    gmv_video: findMetric('A. Doanh số', 'GMV Video'),\n    gmv_the_sp: findMetric('A. Doanh số', 'GMV Thẻ SP')\n  },\n  C_ads: {\n    take_rate: findMetric('C. Ads', 'Take Rate'),\n    roas: findMetric('C. Ads', 'ROAS'),\n    ctr_qc: findMetric('C. Ads', 'CTR QC'),\n    cvr_qc: findMetric('C. Ads', 'CVR QC'),\n    cpa: findMetric('C. Ads', 'CPA'),\n    impressions: findMetric('C. Ads', 'Impressions'),\n    chi_phi_qc: findMetric('C. Ads', 'Chi phí QC'),\n    gmv_ads: findMetric('C. Ads', 'GMV Ads')\n  },\n  F_van_hanh: {\n    ty_le_huy: findMetric('F. Vận hành', 'Tỷ lệ hủy'),\n    ty_le_hoan: findMetric('F. Vận hành', 'Tỷ lệ hoàn')\n  },\n  G_pl: {\n    net_profit_margin: findMetric('G. P&L', 'Net Profit Margin'),\n    loi_nhuan_rong: findMetric('G. P&L', 'Lợi nhuận ròng')\n  }\n  // TODO: thêm B_livestream, D_product_card, E_affiliate khi map xong sheet structure\n};\n\nreturn [{ json: { data, benchmark: benchmarkRows.filter(r => r.metric_group !== '_META') } }];"
+      },
+      "id": "build-prompt-data",
+      "name": "Build Data + Check Kill Switch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "kill-switch",
+      "name": "Kill Switch?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-6\",\n  \"max_tokens\": 4000,\n  \"temperature\": 0.3,\n  \"system\": {{ JSON.stringify($env.CLAUDE_SYSTEM_PROMPT) }},\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify('BENCHMARK:\\n' + JSON.stringify($json.benchmark) + '\\n\\nDATA:\\n' + JSON.stringify($json.data) + '\\n\\nPhân tích theo ma trận phễu v12 và trả về CHỈ JSON theo schema.') }}\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "claude-api",
+      "name": "Claude API (Sonnet 4.6)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 280],
+      "notes": "System prompt nạp qua env var CLAUDE_SYSTEM_PROMPT để không lưu vào workflow JSON"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Claude JSON response\nconst response = $json;\nlet text = response.content[0].text.trim();\n\n// Strip markdown code fences\ntext = text.replace(/^```(?:json)?\\n?/, '').replace(/\\n?```$/, '');\n\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch (e) {\n  throw new Error('Claude did not return valid JSON: ' + e.message + '\\nRaw: ' + text.slice(0, 500));\n}\n\n// Build Lark interactive card\nconst emoji = { green: '✅', yellow: '🟡', red: '🔴' };\nconst warnings = parsed.warnings || [];\nconst spots = parsed.bright_spots || [];\nconst actions = parsed.top_actions_today || [];\nconst flags = parsed.data_quality_flags || [];\n\nlet content = '';\nconst s = parsed.summary || {};\n\ncontent += '**📊 TỔNG QUAN**\\n';\nif (s.gmv_yesterday) {\n  content += `GMV hôm qua: **${(s.gmv_yesterday.value/1e6).toFixed(0)}M** ${emoji[s.gmv_yesterday.status] || ''}`;\n  if (s.gmv_yesterday.vs_benchmark_daily) content += ` (vs daily: ${s.gmv_yesterday.vs_benchmark_daily})`;\n  content += '\\n';\n}\nif (s.gmv_mtd) {\n  content += `MTD: ${(s.gmv_mtd.value/1e9).toFixed(2)}B / ${(s.gmv_mtd.target/1e9).toFixed(1)}B (${s.gmv_mtd.pct}% — ${s.gmv_mtd.pacing_status})\\n`;\n}\nif (s.net_profit_margin_mtd) {\n  content += `Net margin MTD: ${(s.net_profit_margin_mtd.value*100).toFixed(1)}% ${emoji[s.net_profit_margin_mtd.status] || ''}\\n`;\n}\ncontent += '\\n';\n\nif (warnings.length > 0) {\n  content += `**⚠️ WARNING (${warnings.length} chỉ số)**\\n\\n`;\n  for (const w of warnings) {\n    const streak = w.consecutive_days > 1 ? ` — ngày thứ ${w.consecutive_days}` : '';\n    content += `**${w.priority}. ${emoji[w.status]} ${w.metric}: ${w.value}**${streak}\\n`;\n    content += `   ↳ Ngưỡng: ${w.threshold}\\n`;\n    content += `   ↳ Nguyên nhân: ${w.root_cause}\\n`;\n    content += `   ↳ Hành động: ${w.action}\\n`;\n    content += `   ↳ Owner: ${w.owner}\\n`;\n    if (w.missing_data_note) content += `   ℹ️ ${w.missing_data_note}\\n`;\n    content += '\\n';\n  }\n}\n\nif (spots.length > 0) {\n  content += '**✅ ĐIỂM SÁNG**\\n';\n  for (const b of spots) content += `- ${b.metric}: ${b.value} (${b.note})\\n`;\n  content += '\\n';\n}\n\nif (actions.length > 0) {\n  content += '**📋 TOP VIỆC HÔM NAY**\\n';\n  for (const a of actions) content += `${a.priority}. ${a.action} — ${a.owner}\\n`;\n  content += '\\n';\n}\n\nif (flags.length > 0) {\n  content += '**⚙️ DATA NOTES**\\n' + flags.map(f => `- ${f}`).join('\\n');\n}\n\nconst hasRed = warnings.some(w => w.status === 'red');\nconst headerTemplate = hasRed ? 'red' : (warnings.length > 0 ? 'yellow' : 'green');\n\nconst larkCard = {\n  msg_type: 'interactive',\n  card: {\n    header: {\n      title: { tag: 'plain_text', content: `${parsed.project} — ${parsed.date}` },\n      template: headerTemplate\n    },\n    elements: [\n      { tag: 'markdown', content }\n    ]\n  }\n};\n\nreturn [{ json: { larkCard, parsed, should_send: warnings.length > 0 } }];"
+      },
+      "id": "parse-and-render",
+      "name": "Parse JSON → Lark Card",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 280]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.should_send }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "has-warnings",
+      "name": "Có warning?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LARK_WEBHOOK_XKMVN }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.larkCard) }}",
+        "options": {}
+      },
+      "id": "send-lark-project",
+      "name": "Gửi Lark Group XKMVN",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.LARK_WEBHOOK_CEO }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.larkCard) }}",
+        "options": {}
+      },
+      "id": "send-lark-ceo",
+      "name": "Gửi Lark CEO Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 380]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.LOG_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "agent_daily_log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "project": "={{ $json.parsed.project }}",
+            "date": "={{ $json.parsed.date }}",
+            "warnings_count": "={{ ($json.parsed.warnings || []).length }}",
+            "red_metrics": "={{ ($json.parsed.warnings || []).filter(w => w.status === 'red').map(w => w.metric).join(', ') }}",
+            "raw_json": "={{ JSON.stringify($json.parsed) }}"
+          }
+        }
+      },
+      "id": "log-to-sheet",
+      "name": "Log vào Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [2000, 280],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CRED_ID",
+          "name": "Hecatech Google Sheets"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every morning 9:00 AM (Vietnam)": {
+      "main": [[
+        { "node": "Read Dashboard XKMVN", "type": "main", "index": 0 },
+        { "node": "Read Benchmark Config", "type": "main", "index": 0 }
+      ]]
+    },
+    "Read Dashboard XKMVN": {
+      "main": [[{ "node": "Build Data + Check Kill Switch", "type": "main", "index": 0 }]]
+    },
+    "Read Benchmark Config": {
+      "main": [[{ "node": "Build Data + Check Kill Switch", "type": "main", "index": 0 }]]
+    },
+    "Build Data + Check Kill Switch": {
+      "main": [[{ "node": "Kill Switch?", "type": "main", "index": 0 }]]
+    },
+    "Kill Switch?": {
+      "main": [
+        [],
+        [{ "node": "Claude API (Sonnet 4.6)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude API (Sonnet 4.6)": {
+      "main": [[{ "node": "Parse JSON → Lark Card", "type": "main", "index": 0 }]]
+    },
+    "Parse JSON → Lark Card": {
+      "main": [[
+        { "node": "Có warning?", "type": "main", "index": 0 },
+        { "node": "Log vào Google Sheet", "type": "main", "index": 0 }
+      ]]
+    },
+    "Có warning?": {
+      "main": [[
+        { "node": "Gửi Lark Group XKMVN", "type": "main", "index": 0 },
+        { "node": "Gửi Lark CEO Briefing", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": ""
+  },
+  "_HECATECH_NOTES": {
+    "required_env_vars": [
+      "ANTHROPIC_API_KEY — Claude API key từ console.anthropic.com",
+      "CLAUDE_SYSTEM_PROMPT — paste nội dung từ prompt_system.md section 1",
+      "DASHBOARD_SHEET_ID — ID Google Sheet Dashboard Tracking Masterplan",
+      "BENCHMARK_CONFIG_SHEET_ID — ID sheet config benchmark",
+      "LOG_SHEET_ID — ID sheet log",
+      "LARK_WEBHOOK_XKMVN — Webhook URL Lark group dự án XKMVN",
+      "LARK_WEBHOOK_CEO — Webhook URL Lark group CEO Briefing"
+    ],
+    "required_credentials": [
+      "GOOGLE_SHEETS_CRED_ID — Service Account đã share các sheet quyền Viewer"
+    ],
+    "todo_before_production": [
+      "Map đúng cấu trúc sheet Dashboard thực tế (xem node Build Data — function findMetric có thể cần chỉnh theo column name thật)",
+      "Bổ sung lấy is_mega_day từ sheet lịch sự kiện (hiện hardcode false)",
+      "Add error handler khi Claude API fail (retry 3 lần + notify Telegram nếu fail toàn bộ)",
+      "Scale sang 10 dự án còn lại: duplicate sub-workflow cho mỗi project HOẶC dùng loop + switch node"
+    ]
+  }
+}

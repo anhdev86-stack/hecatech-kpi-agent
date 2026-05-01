@@ -1,0 +1,158 @@
+{
+  "name": "Hecatech - SUB Project Warnings",
+  "nodes": [
+    {
+      "id": "sub-warn-001",
+      "name": "When Called by Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {}
+    },
+    {
+      "id": "sub-warn-002",
+      "name": "Split into 11 Project Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// SUB: ALL PROJECT WARNINGS\n// Receives: { projectConfigs, ceoBriefingStatus }\n// Splits into 11 items, loops each project\n// ============================================================\n\nconst input = $input.first().json;\nconst projectConfigs = input.projectConfigs || [];\n\nif (!projectConfigs.length) {\n  return [{ json: { error: 'No project configs received', status: 'skipped' } }];\n}\n\n// Return each project as separate item — will be processed one by one\nreturn projectConfigs.map(p => ({ json: p }));"
+      }
+    },
+    {
+      "id": "sub-warn-003",
+      "name": "Loop One Project at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "sub-warn-004",
+      "name": "Read This Project Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [920, 300],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "={{$json.sheet}}", "mode": "name" },
+        "options": { "headerRow": false, "range": "A1:AK55" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "sub-warn-005",
+      "name": "Check Benchmarks and Build Warning",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// Check project metrics vs benchmarks\n// Builds warning message if any red/yellow detected\n// ============================================================\n\nconst projectConfig = $('Loop One Project at a Time').first().json;\nconst sheetRows = $input.all();\n\nconst col = (item, idx) => {\n  const obj = item.json || item;\n  const keys = Object.keys(obj);\n  return obj[keys[idx]];\n};\nconst fmt = (n) => {\n  n = parseFloat(n) || 0;\n  if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(2) + ' tỷ';\n  if (Math.abs(n) >= 1e6) return Math.round(n/1e6) + ' tr';\n  return (n*100).toFixed(1)+'%' // fallback for ratios\n};\nconst fmtSmart = (name, n) => {\n  n = parseFloat(n) || 0;\n  const isRatio = name.toLowerCase().includes('tỷ lệ') || name.toLowerCase().includes('margin') || name.toLowerCase().includes('rate') || name.toLowerCase().includes('cp/ds') || name.toLowerCase().includes('take rate');\n  if (isRatio) return (n*100).toFixed(1)+'%';\n  if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(2)+' tỷ';\n  if (Math.abs(n) >= 1e6) return Math.round(n/1e6)+' tr';\n  return n.toLocaleString('vi-VN');\n};\n\n// Column mapping: T04 MTD = col 5, yesterday dynamic\nconst today = new Date();\nconst yesterdayColIdx = 5 + today.getDate() - 1; // Apr1=col6, Apr23=col28\n\n// Extract all metrics\nconst metricsData = {};\nsheetRows.forEach(item => {\n  const name = (col(item, 0) || '').toString().trim();\n  const benchmark = (col(item, 1) || '').toString().trim();\n  if (!name || name.length < 3 || /^[A-Z]\\./i.test(name)) return;\n  metricsData[name] = {\n    benchmark,\n    mtd: parseFloat(col(item, 5)) || 0,\n    yesterday: parseFloat(col(item, yesterdayColIdx)) || 0,\n    hasBenchmark: benchmark.includes('🔴') || benchmark.includes('✅')\n  };\n});\n\n// Key metrics to check (ones with benchmarks)\nconst keyMetrics = [\n  'Tổng GMV', 'GMV Livestream', 'CP/DS Live', 'GMV Ads',\n  'Ads/DS (Take Rate)', '★ LỢI NHUẬN RÒNG', 'Net Profit Margin',\n  'Tỷ lệ hủy đơn', 'Tỷ lệ hoàn', 'DS từ Booking', 'Affiliate Video GMV'\n];\n\nconst metricsForClaude = keyMetrics\n  .filter(k => metricsData[k])\n  .map(k => ({\n    name: k,\n    benchmark: metricsData[k].benchmark,\n    mtd_fmt: fmtSmart(k, metricsData[k].mtd),\n    yesterday_fmt: fmtSmart(k, metricsData[k].yesterday),\n    mtd_raw: metricsData[k].mtd,\n    yesterday_raw: metricsData[k].yesterday\n  }));\n\nconst hasData = metricsForClaude.length > 0;\n\n// Build Claude prompt for this project\nconst systemPrompt = `Bạn là AI phân tích dự án ${projectConfig.name} của Hecatech (thị trường: ${projectConfig.market}).\nPhân tích chỉ số so với benchmark và tạo daily warning message cho team.\nViết tiếng Việt, súc tích, tập trung hành động. Dưới 220 từ.`;\n\nconst today_str = today.toLocaleDateString('vi-VN');\nconst userPrompt = `Dự án: ${projectConfig.name} | Ngày: ${today_str}\n\nChỉ số MTD và hôm qua (với benchmark):\n${JSON.stringify(metricsForClaude, null, 2)}\n\nTạo warning message theo format:\n\n⚡ ${projectConfig.name.toUpperCase()} — ${today_str}\n\n[Nếu có chỉ số vượt ngưỡng đỏ trong benchmark:]\n🔴 VẤN ĐỀ CẦN XỬ LÝ:\n• [Tên]: [giá trị] (benchmark: [ngưỡng]) → [hành động cụ thể]\n\n[Nếu có chỉ số vàng:]\n🟡 THEO DÕI: [tóm tắt ngắn]\n\n✅ TÍCH CỰC: [1-2 điểm tốt]\n\n📋 TODO: [1-2 việc ưu tiên nhất hôm nay]\n\nNếu mọi chỉ số đều OK: chỉ viết \"✅ ${projectConfig.name} ổn định — không có cảnh báo.\" (1 dòng)`;\n\nreturn [{\n  json: {\n    projectConfig,\n    hasData,\n    metricsForClaude,\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 600,\n      system: systemPrompt,\n      messages: [{ role: 'user', content: userPrompt }]\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-warn-006",
+      "name": "Has Data Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1400, 300],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "check-has-data",
+              "leftValue": "={{$json.hasData}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sub-warn-007",
+      "name": "Claude Project Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{$vars.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.claudeRequest)}}"
+      }
+    },
+    {
+      "id": "sub-warn-008",
+      "name": "Format and Send Project Warning",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 180],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const claudeResponse = $input.first().json;\nconst warningText = claudeResponse?.content?.[0]?.text || '⚠️ Lỗi phân tích.';\nconst projectConfig = $('Check Benchmarks and Build Warning').first().json.projectConfig;\n\nreturn [{\n  json: {\n    webhookUrl: projectConfig.webhook,\n    larkMessage: { msg_type: 'text', content: { text: warningText } }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-warn-009",
+      "name": "Send to Project Lark Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2120, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.webhookUrl}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.larkMessage)}}"
+      }
+    },
+    {
+      "id": "sub-warn-010",
+      "name": "Skip No Data Project",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1640, 420],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "When Called by Main":                { "main": [[{ "node": "Split into 11 Project Items",        "type": "main", "index": 0 }]] },
+    "Split into 11 Project Items":        { "main": [[{ "node": "Loop One Project at a Time",          "type": "main", "index": 0 }]] },
+    "Loop One Project at a Time":         { "main": [[{ "node": "Read This Project Sheet",             "type": "main", "index": 0 }]] },
+    "Read This Project Sheet":            { "main": [[{ "node": "Check Benchmarks and Build Warning",  "type": "main", "index": 0 }]] },
+    "Check Benchmarks and Build Warning": { "main": [[{ "node": "Has Data Check",                      "type": "main", "index": 0 }]] },
+    "Has Data Check": {
+      "main": [
+        [{ "node": "Claude Project Analysis",      "type": "main", "index": 0 }],
+        [{ "node": "Skip No Data Project",         "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude Project Analysis":            { "main": [[{ "node": "Format and Send Project Warning",     "type": "main", "index": 0 }]] },
+    "Format and Send Project Warning":    { "main": [[{ "node": "Send to Project Lark Group",          "type": "main", "index": 0 }]] },
+    "Send to Project Lark Group":         { "main": [[{ "node": "Loop One Project at a Time",          "type": "main", "index": 0 }]] },
+    "Skip No Data Project":               { "main": [[{ "node": "Loop One Project at a Time",          "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}

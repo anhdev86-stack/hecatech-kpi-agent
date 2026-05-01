@@ -1,0 +1,174 @@
+{
+  "name": "Hecatech - SUB Review Management (Agent #4)",
+  "nodes": [
+    {
+      "id": "rev-001",
+      "name": "When Called by Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {}
+    },
+    {
+      "id": "rev-002",
+      "name": "Fetch New Reviews from Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.REVIEW_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Reviews", "mode": "name" },
+        "options": {
+          "headerRow": true,
+          "filters": {
+            "conditions": [
+              {
+                "column": "Trạng thái",
+                "condition": "equals",
+                "value": "Chưa xử lý"
+              }
+            ]
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "rev-003",
+      "name": "Classify and Draft Replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// AGENT #4 — REVIEW MANAGEMENT\n// Phân loại review tiêu cực, draft câu trả lời, escalate nghiêm trọng\n// Input: Danh sách review mới chưa xử lý từ Google Sheets\n// ============================================================\n\nconst reviews = $input.all().map(item => item.json);\n\nif (!reviews.length) {\n  return [{ json: { hasReviews: false, message: 'Không có review mới cần xử lý.' } }];\n}\n\n// Phân loại theo theme\nconst THEMES = {\n  'chat_luong':  { keywords: ['hỏng', 'kém', 'dở', 'tệ', 'chất lượng', 'không dùng được', 'fake', 'giả', 'không hiệu quả'],  label: '⚠️ Chất lượng sản phẩm' },\n  'giao_hang':  { keywords: ['chậm', 'trễ', 'giao hàng', 'shipping', 'đóng gói', 'hộp bị', 'vỡ', 'bị móp'],               label: '📦 Giao hàng/Đóng gói' },\n  'gia_ca':     { keywords: ['đắt', 'giá cao', 'không xứng', 'không đáng', 'mắc'],                                          label: '💰 Giá cả' },\n  'dich_vu':    { keywords: ['tư vấn', 'hỗ trợ', 'cs', 'nhân viên', 'thái độ', 'phục vụ', 'không reply'],                 label: '🎧 Dịch vụ khách hàng' },\n  'san_pham':   { keywords: ['mô tả không đúng', 'khác ảnh', 'sai màu', 'sai size', 'không như quảng cáo'],                label: '🔍 Sản phẩm không đúng mô tả' }\n};\n\nconst ESCALATE_TRIGGERS = ['kiện', 'tố cáo', 'lừa đảo', 'báo cơ quan', 'media', 'báo chí', 'công an', '1 sao tất cả'];\n\nconst classifiedReviews = reviews.map(r => {\n  const content = (r['Nội dung review'] || r['content'] || '').toLowerCase();\n  const rating = parseInt(r['Số sao'] || r['rating'] || 1);\n  const platform = r['Sàn'] || r['platform'] || 'TikTok';\n  const product = r['Sản phẩm'] || r['product'] || 'N/A';\n  const reviewId = r['Review ID'] || r['id'] || 'N/A';\n\n  // Detect theme\n  let detectedTheme = 'khac';\n  let themeLabel = '❓ Khác';\n  for (const [key, cfg] of Object.entries(THEMES)) {\n    if (cfg.keywords.some(kw => content.includes(kw))) {\n      detectedTheme = key;\n      themeLabel = cfg.label;\n      break;\n    }\n  }\n\n  // Check if needs escalation\n  const needsEscalation = ESCALATE_TRIGGERS.some(t => content.includes(t)) || rating === 1;\n\n  // Severity\n  const severity = needsEscalation ? 'ESCALATE' : rating <= 2 ? 'HIGH' : 'MEDIUM';\n\n  return {\n    reviewId, platform, product, rating,\n    content: r['Nội dung review'] || r['content'] || '',\n    theme: detectedTheme,\n    themeLabel,\n    severity,\n    needsEscalation\n  };\n});\n\n// Group for Claude\nconst escalations = classifiedReviews.filter(r => r.needsEscalation);\nconst highPriority = classifiedReviews.filter(r => r.severity === 'HIGH' && !r.needsEscalation);\nconst normal = classifiedReviews.filter(r => r.severity === 'MEDIUM');\n\n// Build Claude request for batch processing\nconst systemPrompt = `Bạn là chuyên gia customer service của Hecatech — công ty bán mỹ phẩm, chăm sóc da, xịt khử mùi trên TikTok và Shopee.\nNhiệm vụ:\n1. Phân tích từng review tiêu cực\n2. Draft câu trả lời phù hợp theo từng theme (chất lượng/giao hàng/giá/dịch vụ)\n3. Đề xuất cách xử lý nội bộ\n\nPhong cách trả lời: chân thành, xin lỗi thực tâm, đề xuất giải pháp cụ thể, không copy-paste template cứng nhắc.\nNgôn ngữ: tiếng Việt, thân thiện, professional.`;\n\nconst reviewsForClaude = [...escalations, ...highPriority].slice(0, 10); // Max 10 reviews per run\n\nconst userPrompt = `XỬ LÝ REVIEW TIÊU CỰC — ${new Date().toLocaleDateString('vi-VN')}\n\nTổng: ${reviews.length} review mới | Cần escalate: ${escalations.length} | Ưu tiên cao: ${highPriority.length} | Bình thường: ${normal.length}\n\nDanh sách review cần xử lý (${reviewsForClaude.length} review):\n${JSON.stringify(reviewsForClaude, null, 2)}\n\nCho mỗi review, trả về:\n1. REPLY DRAFT (dưới 80 từ, đăng ngay lên ${reviewsForClaude[0]?.platform || 'TikTok'})\n2. XỬ LÝ NỘI BỘ (giao ai, làm gì trong 24h)\n3. ESCALATE (có/không — nếu có, ghi lý do)\n\nFormat output:\n---\nReview #[ID] | [Sản phẩm] | ⭐[Số sao]\n📱 REPLY: [câu trả lời]\n🔧 NỘI BỘ: [hành động]\n🚨 ESCALATE: [có/không]\n---`;\n\nreturn [{\n  json: {\n    totalReviews: reviews.length,\n    escalations: escalations.length,\n    highPriority: highPriority.length,\n    hasReviews: reviews.length > 0,\n    needsAttention: escalations.length > 0 || highPriority.length > 0,\n    classifiedReviews,\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 2000,\n      system: systemPrompt,\n      messages: [{ role: 'user', content: userPrompt }]\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "rev-004",
+      "name": "Has Reviews to Handle",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 300],
+      "parameters": {
+        "conditions": {
+          "conditions": [{ "id": "c1", "leftValue": "={{$json.hasReviews}}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }]
+        }
+      }
+    },
+    {
+      "id": "rev-005",
+      "name": "Claude Review Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 180],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{$vars.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.claudeRequest)}}"
+      }
+    },
+    {
+      "id": "rev-006",
+      "name": "Format Review Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 180],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const claudeResponse = $input.first().json;\nconst replyDrafts = claudeResponse?.content?.[0]?.text || '⚠️ Lỗi phân tích review.';\nconst reviewData = $('Classify and Draft Replies').first().json;\n\nconst header = `📝 REVIEW MANAGEMENT REPORT — ${new Date().toLocaleDateString('vi-VN')}\\n\\n📊 Tổng quan: ${reviewData.totalReviews} review mới | 🚨 Escalate: ${reviewData.escalations} | ⚠️ Ưu tiên cao: ${reviewData.highPriority}\\n\\n`;\n\n// Escalation alert (separate message for CS lead)\nconst escalationMsg = reviewData.escalations > 0\n  ? `🚨 CÓ ${reviewData.escalations} REVIEW CẦN ESCALATE NGAY — CS Lead xem và xử lý trong 1 giờ.\\n\\n`\n  : '';\n\nconst fullReport = header + escalationMsg + replyDrafts;\n\nreturn [{\n  json: {\n    larkCsMessage: { msg_type: 'text', content: { text: fullReport } },\n    larkEscalationMessage: reviewData.escalations > 0\n      ? { msg_type: 'text', content: { text: `🚨 ESCALATION ALERT\\n${fullReport}` } }\n      : null,\n    needsEscalation: reviewData.escalations > 0\n  }\n}];"
+      }
+    },
+    {
+      "id": "rev-007",
+      "name": "Send to CS Team Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 140],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.LARK_CS_WEBHOOK_URL}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.larkCsMessage)}}"
+      }
+    },
+    {
+      "id": "rev-008",
+      "name": "Escalation Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1640, 300],
+      "parameters": {
+        "conditions": {
+          "conditions": [{ "id": "c-esc", "leftValue": "={{$json.needsEscalation}}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }]
+        }
+      }
+    },
+    {
+      "id": "rev-009",
+      "name": "Send Escalation to CEO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1880, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.LARK_CEO_WEBHOOK_URL}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.larkEscalationMessage)}}"
+      }
+    },
+    {
+      "id": "rev-010",
+      "name": "Return Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2120, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const d = $('Classify and Draft Replies').first().json;\nreturn [{ json: { reviewStatus: 'done', totalHandled: d.totalReviews || 0, escalations: d.escalations || 0 } }];"
+      }
+    }
+  ],
+  "connections": {
+    "When Called by Main":          { "main": [[{ "node": "Fetch New Reviews from Sheets",  "type": "main", "index": 0 }]] },
+    "Fetch New Reviews from Sheets":{ "main": [[{ "node": "Classify and Draft Replies",      "type": "main", "index": 0 }]] },
+    "Classify and Draft Replies":   { "main": [[{ "node": "Has Reviews to Handle",           "type": "main", "index": 0 }]] },
+    "Has Reviews to Handle": {
+      "main": [
+        [{ "node": "Claude Review Analysis",  "type": "main", "index": 0 }],
+        [{ "node": "Return Status",           "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude Review Analysis":       { "main": [[{ "node": "Format Review Report",            "type": "main", "index": 0 }]] },
+    "Format Review Report":         { "main": [[{ "node": "Send to CS Team Group",            "type": "main", "index": 0 }]] },
+    "Send to CS Team Group":        { "main": [[{ "node": "Escalation Check",                 "type": "main", "index": 0 }]] },
+    "Escalation Check": {
+      "main": [
+        [{ "node": "Send Escalation to CEO",  "type": "main", "index": 0 }],
+        [{ "node": "Return Status",           "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Escalation to CEO":       { "main": [[{ "node": "Return Status",                   "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}

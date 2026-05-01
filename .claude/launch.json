@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Hecatech AI Agent Web UI",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "uvicorn", "app:app", "--reload", "--host", "127.0.0.1", "--port", "3000"],
+      "port": 3000
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "name": "Hecatech - SUB CEO Briefing",
+  "nodes": [
+    {
+      "id": "sub-ceo-001",
+      "name": "When Called by Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {}
+    },
+    {
+      "id": "sub-ceo-002",
+      "name": "Build Claude CEO Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// SUB: CEO BRIEFING\n// Receives: { dashboardData, projectConfigs }\n// Returns: { projectConfigs } — passed through to Project Warnings sub\n// ============================================================\n\nconst input = $input.first().json;\nconst d = input.dashboardData;\nconst projectConfigs = input.projectConfigs; // Pass-through for next sub\n\nconst systemPrompt = `Bạn là AI phân tích kinh doanh cấp cao của Hecatech — công ty TikTok/Shopee commerce vận hành nhiều dự án trên các thị trường VN, Thái Lan, Malaysia, Philippines, Mỹ.\n\nNhiệm vụ: Tạo bản tin buổi sáng súc tích cho CEO. Phong cách: thẳng thắn, quyết đoán, tập trung hành động.\n\nCác dự án:\n- KTLVN: KTL Vietnam (flagship doanh số lớn nhất)\n- XKMVN: Xịt Khử Mùi Vietnam\n- TDCVN / KTMVN / MNVN: Các brand VN khác\n- KTMR / SRMR: Thị trường đa quốc gia\n- KTLTL / XKMTL: Thái Lan | XKMPH: Philippines | XKMMY: Malaysia`;\n\nconst userPrompt = `Data kinh doanh ngày ${d.reportDate}:\n${JSON.stringify(d, null, 2)}\n\nTạo CEO Morning Briefing theo ĐÚNG format (tiếng Việt, dưới 380 từ):\n\n📊 HECATECH MORNING BRIEFING — ${d.reportDate}\n\n🏆 TỔNG QUAN\n• Doanh số hôm qua: ${d.summary.totalDoanhSo}\n• Lợi nhuận ròng MTD: ${d.tiktokMTD.loiNhuanRong} (${d.tiktokMTD.netProfitMargin})\n• GMV TikTok MTD: ${d.tiktokMTD.gmv}\n• Tình trạng: ✅ ${d.summary.green} xanh | 🟡 ${d.summary.yellow} vàng | 🔴 ${d.summary.red} đỏ\n\n🔴 CẦN XỬ LÝ NGAY\n[Phân tích từng dự án đỏ: số liệu thực + nguyên nhân có thể + 1 hành động cụ thể kèm tên người chịu trách nhiệm]\n[Nếu không có: \"Tất cả dự án đang đạt hoặc gần target 🎯\"]\n\n🟡 THEO DÕI\n[Dự án vàng + lưu ý ngắn]\n[Nếu không có: bỏ section]\n\n✅ ĐANG THẮNG\n[Top 2-3 dự án tốt nhất + 1 điểm nổi bật]\n\n💡 TOP 3 VIỆC CẦN LÀM HÔM NAY\n1. [Hành động — Người làm — Deadline]\n2. [Hành động — Người làm — Deadline]\n3. [Hành động — Người làm — Deadline]`;\n\nreturn [{\n  json: {\n    projectConfigs, // Pass-through — Project Warnings sub will need this\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 1500,\n      system: systemPrompt,\n      messages: [{ role: 'user', content: userPrompt }]\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-ceo-003",
+      "name": "Claude CEO Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{$vars.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.claudeRequest)}}"
+      }
+    },
+    {
+      "id": "sub-ceo-004",
+      "name": "Extract and Send CEO Lark",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const claudeResponse = $input.first().json;\nconst briefingText = claudeResponse?.content?.[0]?.text || '⚠️ Lỗi lấy dữ liệu từ AI.';\n\n// Retrieve projectConfigs from the Build Request node (before Claude consumed it)\nconst projectConfigs = $('Build Claude CEO Request').first().json.projectConfigs;\n\nreturn [{\n  json: {\n    projectConfigs, // Pass-through to Project Warnings sub\n    larkMessage: { msg_type: 'text', content: { text: briefingText } }\n  }\n}];"
+      }
+    },
+    {
+      "id": "sub-ceo-005",
+      "name": "Send to CEO Lark Group",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.LARK_CEO_WEBHOOK_URL}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.larkMessage)}}"
+      }
+    },
+    {
+      "id": "sub-ceo-006",
+      "name": "Return ProjectConfigs to Main",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Return projectConfigs so Main Orchestrator can pass it to Project Warnings sub\nconst projectConfigs = $('Extract and Send CEO Lark').first().json.projectConfigs;\nreturn [{ json: { projectConfigs, ceoBriefingStatus: 'sent' } }];"
+      }
+    }
+  ],
+  "connections": {
+    "When Called by Main":        { "main": [[{ "node": "Build Claude CEO Request",   "type": "main", "index": 0 }]] },
+    "Build Claude CEO Request":   { "main": [[{ "node": "Claude CEO Analysis",         "type": "main", "index": 0 }]] },
+    "Claude CEO Analysis":        { "main": [[{ "node": "Extract and Send CEO Lark",   "type": "main", "index": 0 }]] },
+    "Extract and Send CEO Lark":  { "main": [[{ "node": "Send to CEO Lark Group",      "type": "main", "index": 0 }]] },
+    "Send to CEO Lark Group":     { "main": [[{ "node": "Return ProjectConfigs to Main","type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}

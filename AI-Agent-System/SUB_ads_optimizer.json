@@ -1,0 +1,166 @@
+{
+  "name": "Hecatech - SUB Ads Optimizer (Agent #1)",
+  "nodes": [
+    {
+      "id": "ads-001",
+      "name": "When Called by Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {}
+    },
+    {
+      "id": "ads-002",
+      "name": "Read Ads Performance Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Tổng hợp", "mode": "name" },
+        "options": { "headerRow": false, "range": "A1:AG60" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "ads-003",
+      "name": "Detect Bleeding Campaigns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// AGENT #1 — ADS OPTIMIZER\n// Phát hiện chiến dịch 'chảy máu': ROAS thấp, CPA đột biến\n// Take Rate vượt ngưỡng, CP/DS tăng bất thường\n// ============================================================\n\nconst sheetItems = $input.all();\nconst input = $('When Called by Main').first().json;\nconst projectConfigs = input.projectConfigs || [];\n\nconst col = (item, idx) => {\n  const obj = item.json || item;\n  return Object.values(obj)[idx];\n};\n\nconst today = new Date();\nconst dayIdx = today.getDate();\n// Columns: 0=Chỉ số, 1=Benchmark, 2=T01, 3=T02, 4=T03, 5=T04 MTD, 6=Apr1...\nconst dCol = 5 + dayIdx - 1; // yesterday\nconst d2Col = dCol - 1;       // 2 days ago\nconst d3Col = dCol - 2;       // 3 days ago\n\n// Extract metrics\nconst m = {};\nsheetItems.forEach(item => {\n  const name = (col(item, 0) || '').toString().trim();\n  if (!name || name.length < 2) return;\n  m[name] = {\n    mtd:   parseFloat(col(item, 5))  || 0,\n    d1:    parseFloat(col(item, dCol))  || 0,\n    d2:    parseFloat(col(item, d2Col)) || 0,\n    d3:    parseFloat(col(item, d3Col)) || 0,\n    bm:    (col(item, 1) || '').toString()\n  };\n});\n\n// ---- BLEEDING DETECTION RULES ----\nconst alerts = [];\n\nconst pct = (a, b) => b !== 0 ? ((a - b) / Math.abs(b) * 100).toFixed(1) : 0;\nconst fmt = (n) => {\n  n = parseFloat(n) || 0;\n  if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(2)+' tỷ';\n  if (Math.abs(n) >= 1e6) return Math.round(n/1e6)+' tr';\n  return n.toLocaleString('vi-VN');\n};\nconst fmtPct = n => (parseFloat(n)*100).toFixed(1)+'%';\n\n// Rule 1: Take Rate (Ads/DS) vượt ngưỡng 30%\nconst takeRate = m['Ads/DS (Take Rate)'];\nif (takeRate && takeRate.d1 > 0.30) {\n  alerts.push({\n    severity: takeRate.d1 > 0.35 ? '🔴 NGHIÊM TRỌNG' : '🟡 CẢNH BÁO',\n    metric: 'Take Rate (Ads/DS)',\n    value: fmtPct(takeRate.d1),\n    threshold: '≤ 30%',\n    trend: `Hôm qua: ${fmtPct(takeRate.d1)} | T-2: ${fmtPct(takeRate.d2)} | T-3: ${fmtPct(takeRate.d3)}`,\n    action: 'Giảm bid ngay trên TikTok Ads Manager. Review top campaigns theo CPA. Tắt ad sets có ROAS < 2.',\n    owner: 'SaoBT + Lead Ads từng dự án'\n  });\n}\n\n// Rule 2: CP/DS Livestream vượt ngưỡng 30%\nconst cpdsLive = m['CP/DS Live'];\nif (cpdsLive && cpdsLive.d1 > 0.30) {\n  const trend3days = [cpdsLive.d3, cpdsLive.d2, cpdsLive.d1];\n  const increasing = trend3days.every((v, i) => i === 0 || v >= trend3days[i-1]);\n  alerts.push({\n    severity: increasing ? '🔴 NGHIÊM TRỌNG (3 ngày liên tiếp tăng)' : '🟡 CẢNH BÁO',\n    metric: 'CP/DS Livestream',\n    value: fmtPct(cpdsLive.d1),\n    threshold: '≤ 30%',\n    trend: `T-3→T-1: ${fmtPct(cpdsLive.d3)} → ${fmtPct(cpdsLive.d2)} → ${fmtPct(cpdsLive.d1)}`,\n    action: 'Kiểm tra GPM, GMV/giờ livestream. Nếu GPM < 50K: đổi host hoặc tăng voucher. Review lịch live vs khung giờ peak.',\n    owner: 'Lead Livestream + PM dự án'\n  });\n}\n\n// Rule 3: GMV Ads giảm >20% so với hôm qua\nconst gmvAds = m['GMV Ads'];\nif (gmvAds && gmvAds.d2 > 0) {\n  const drop = parseFloat(pct(gmvAds.d1, gmvAds.d2));\n  if (drop < -20) {\n    alerts.push({\n      severity: drop < -35 ? '🔴 NGHIÊM TRỌNG' : '🟡 CẢNH BÁO',\n      metric: 'GMV Ads',\n      value: fmt(gmvAds.d1),\n      prev: fmt(gmvAds.d2),\n      change: drop.toFixed(1)+'%',\n      threshold: 'Giảm > 20% so với ngày trước',\n      action: 'Check ngân sách ads có hết không. Kiểm tra quality score creative. Review audience overlap. Xem CPM có tăng đột biến không.',\n      owner: 'SaoBT'\n    });\n  }\n}\n\n// Rule 4: Chi phí Ads tăng >25% nhưng GMV không tăng tương ứng\nconst chiPhiAds = m['Chi phí quảng cáo Ads'];\nif (chiPhiAds && gmvAds && chiPhiAds.d2 > 0 && gmvAds.d2 > 0) {\n  const costChange = parseFloat(pct(chiPhiAds.d1, chiPhiAds.d2));\n  const gmvChange  = parseFloat(pct(gmvAds.d1, gmvAds.d2));\n  if (costChange > 25 && gmvChange < costChange - 15) {\n    alerts.push({\n      severity: '🔴 CHẢY MÁU',\n      metric: 'Chi phí Ads tăng mạnh, GMV không theo',\n      costChange: '+' + costChange.toFixed(1)+'%',\n      gmvChange: gmvChange.toFixed(1)+'%',\n      action: 'Pause ngay các campaign có ROAS thấp nhất. Giữ budget cho top 20% campaign hiệu quả nhất. Report chi tiết theo campaign level.',\n      owner: 'SaoBT — BÁO CÁO TRONG 2 GIỜ'\n    });\n  }\n}\n\n// Rule 5: Net Profit Margin âm\nconst npm = m['Net Profit Margin'];\nif (npm && npm.d1 < 0) {\n  alerts.push({\n    severity: '🔴 KHẨN CẤP — THUA LỖ',\n    metric: 'Net Profit Margin',\n    value: fmtPct(npm.d1),\n    action: 'Dừng scale ngay. Review P&L theo từng kênh. Tạm giảm 30% ngân sách ads đến khi margin dương.',\n    owner: 'CEO + SaoBT'\n  });\n}\n\n// Rule 6: Tỷ lệ hủy đơn > 15%\nconst huyDon = m['Tỷ lệ hủy đơn'];\nif (huyDon && huyDon.d1 > 0.15) {\n  alerts.push({\n    severity: huyDon.d1 > 0.20 ? '🔴 NGHIÊM TRỌNG' : '🟡 CẢNH BÁO',\n    metric: 'Tỷ lệ hủy đơn',\n    value: fmtPct(huyDon.d1),\n    threshold: '≤ 15%',\n    action: 'Kiểm tra lý do hủy (hết hàng? giao hàng chậm? giá không match?). Check stock tồn kho. Review landing page CVR.',\n    owner: 'Lead Vận hành'\n  });\n}\n\n// Summary stats\nconst summaryStats = {\n  takeRate:       takeRate  ? fmtPct(takeRate.d1)  : 'N/A',\n  cpdsLive:       cpdsLive  ? fmtPct(cpdsLive.d1)  : 'N/A',\n  gmvAds_ytd:     gmvAds    ? fmt(gmvAds.d1)        : 'N/A',\n  chiPhiAds_ytd:  chiPhiAds ? fmt(chiPhiAds.d1)     : 'N/A',\n  netProfitMargin: npm       ? fmtPct(npm.d1)        : 'N/A',\n  huyDon:         huyDon    ? fmtPct(huyDon.d1)     : 'N/A'\n};\n\nconst criticalAlerts = alerts.filter(a => a.severity.includes('🔴'));\nconst warningAlerts  = alerts.filter(a => a.severity.includes('🟡'));\n\n// Build Claude request\nconst systemPrompt = `Bạn là AI Ads Optimizer của Hecatech — chuyên phát hiện và xử lý chiến dịch ads đang 'chảy máu'.\nNhiệm vụ: Phân tích các cảnh báo và tạo alert message cụ thể, có thể hành động ngay.\nViết tiếng Việt. Súc tích. Số liệu thực tế. Ưu tiên critical trước.`;\n\nconst today_str = today.toLocaleDateString('vi-VN');\nconst userPrompt = `DAILY ADS OPTIMIZER REPORT — ${today_str}\n\nKẾT QUẢ PHÂN TÍCH:\n${JSON.stringify({ criticalAlerts, warningAlerts, summaryStats }, null, 2)}\n\nTạo Ads Alert Message theo format:\n\n🚨 ADS OPTIMIZER ALERT — ${today_str}\n\n[Nếu có critical alerts]\n🔴 HÀNH ĐỘNG NGAY (trong 2 giờ):\n[Mỗi alert: metric + số liệu thực + nguyên nhân có thể + hành động cụ thể + owner]\n\n[Nếu có warning alerts]\n🟡 THEO DÕI HÔM NAY:\n[Tóm tắt ngắn]\n\n📊 KHỬ BỠI NHANH:\n• Take Rate: [giá trị] | CP/DS Live: [giá trị] | Hủy đơn: [giá trị]\n\n[Nếu không có alert nào]\n✅ Ads đang trong ngưỡng an toàn — không có cảnh báo.\n\nDưới 280 từ.`;\n\nreturn [{\n  json: {\n    projectConfigs,\n    alerts,\n    hasCritical: criticalAlerts.length > 0,\n    hasAlerts: alerts.length > 0,\n    summaryStats,\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 800,\n      system: systemPrompt,\n      messages: [{ role: 'user', content: userPrompt }]\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "ads-004",
+      "name": "Claude Ads Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{$vars.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.claudeRequest)}}"
+      }
+    },
+    {
+      "id": "ads-005",
+      "name": "Route by Severity",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1160, 300],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [{ "id": "c1", "leftValue": "={{$('Detect Bleeding Campaigns').first().json.hasCritical}}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }]
+              },
+              "outputKey": "0"
+            },
+            {
+              "conditions": {
+                "conditions": [{ "id": "c2", "leftValue": "={{$('Detect Bleeding Campaigns').first().json.hasAlerts}}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }]
+              },
+              "outputKey": "1"
+            }
+          ]
+        },
+        "fallbackOutput": "2"
+      }
+    },
+    {
+      "id": "ads-006",
+      "name": "Send CRITICAL to CEO + Ads Group",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 160],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Critical: send to BOTH CEO group AND Ads group\nconst alertText = $input.first().json?.content?.[0]?.text || '⚠️ Lỗi phân tích Ads.';\nconst larkMsg = { msg_type: 'text', content: { text: alertText } };\nreturn [\n  { json: { url: $vars.LARK_CEO_WEBHOOK_URL,  larkMessage: larkMsg } },\n  { json: { url: $vars.LARK_ADS_WEBHOOK_URL,  larkMessage: larkMsg } }\n];"
+      }
+    },
+    {
+      "id": "ads-007",
+      "name": "Send WARNING to Ads Group Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 320],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const alertText = $input.first().json?.content?.[0]?.text || '⚠️ Lỗi.';\nreturn [{ json: { url: $vars.LARK_ADS_WEBHOOK_URL, larkMessage: { msg_type: 'text', content: { text: alertText } } } }];"
+      }
+    },
+    {
+      "id": "ads-008",
+      "name": "No Alert Today",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1400, 480],
+      "parameters": {}
+    },
+    {
+      "id": "ads-009",
+      "name": "Send Alerts to Lark",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1640, 240],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.url}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.larkMessage)}}"
+      }
+    },
+    {
+      "id": "ads-010",
+      "name": "Return Status to Main",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const adsData = $('Detect Bleeding Campaigns').first().json;\nreturn [{ json: { adsOptimizerStatus: 'done', alertCount: adsData.alerts?.length || 0, hasCritical: adsData.hasCritical } }];"
+      }
+    }
+  ],
+  "connections": {
+    "When Called by Main":          { "main": [[{ "node": "Read Ads Performance Sheet",    "type": "main", "index": 0 }]] },
+    "Read Ads Performance Sheet":   { "main": [[{ "node": "Detect Bleeding Campaigns",     "type": "main", "index": 0 }]] },
+    "Detect Bleeding Campaigns":    { "main": [[{ "node": "Claude Ads Analysis",           "type": "main", "index": 0 }]] },
+    "Claude Ads Analysis":          { "main": [[{ "node": "Route by Severity",             "type": "main", "index": 0 }]] },
+    "Route by Severity": {
+      "main": [
+        [{ "node": "Send CRITICAL to CEO + Ads Group", "type": "main", "index": 0 }],
+        [{ "node": "Send WARNING to Ads Group Only",   "type": "main", "index": 0 }],
+        [{ "node": "No Alert Today",                   "type": "main", "index": 0 }]
+      ]
+    },
+    "Send CRITICAL to CEO + Ads Group": { "main": [[{ "node": "Send Alerts to Lark",     "type": "main", "index": 0 }]] },
+    "Send WARNING to Ads Group Only":   { "main": [[{ "node": "Send Alerts to Lark",     "type": "main", "index": 0 }]] },
+    "Send Alerts to Lark":              { "main": [[{ "node": "Return Status to Main",    "type": "main", "index": 0 }]] },
+    "No Alert Today":                   { "main": [[{ "node": "Return Status to Main",    "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}

@@ -1,0 +1,88 @@
+{
+  "project": "XKMVN",
+  "date": "2026-04-12",
+  "summary": {
+    "gmv_yesterday": {
+      "value": 205000000,
+      "status": "green",
+      "vs_benchmark_daily": "+23%"
+    },
+    "gmv_mtd": {
+      "value": 2400000000,
+      "target": 5000000000,
+      "pct": 48,
+      "pacing_status": "on_track"
+    },
+    "net_profit_margin_mtd": {
+      "value": 0.109,
+      "status": "yellow"
+    }
+  },
+  "warnings": [
+    {
+      "priority": 1,
+      "metric": "Take Rate",
+      "value": "32.4%",
+      "status": "red",
+      "threshold": "benchmark ≤ 28%",
+      "consecutive_days": 12,
+      "root_cause": "TikTok tăng platform fee từ 28% → 32% kể từ 01/04. Đây là thay đổi chính sách hệ thống, không phải lỗi vận hành.",
+      "action": "CEO xem xét renegotiate với TikTok account manager hoặc điều chỉnh giá bán để bù COGS. SaoBT cần mô hình lại P&L với take rate mới.",
+      "owner": "SaoBT + CEO",
+      "missing_data_note": null
+    },
+    {
+      "priority": 2,
+      "metric": "CPA",
+      "value": "54.6K VND",
+      "status": "yellow",
+      "threshold": "benchmark ngày ≤ 52K",
+      "consecutive_days": 3,
+      "root_cause": "CTR giảm nhẹ từ 2.53% → 2.49% — creative hiện tại có dấu hiệu mệt mỏi sau 12 ngày chạy liên tục.",
+      "action": "TuND refresh ít nhất 3 creative mới trước 15/04 (TikTok Sale). SaoBT test 2 angle mới: 'before/after' và 'social proof' format.",
+      "owner": "SaoBT + TuND",
+      "missing_data_note": null
+    }
+  ],
+  "bright_spots": [
+    {
+      "metric": "AOV Live",
+      "value": "243K VND",
+      "note": "cao nhất trong 12 ngày qua — LinhDTH đang upsell hiệu quả"
+    },
+    {
+      "metric": "GMV hôm qua",
+      "value": "205M VND",
+      "note": "+23% vs benchmark ngày — vượt kế hoạch ngày"
+    },
+    {
+      "metric": "CVR Product Card",
+      "value": "54.8%",
+      "note": "ổn định cao, thumbnail đang hoạt động tốt"
+    }
+  ],
+  "top_actions_today": [
+    {
+      "priority": 1,
+      "action": "CEO + SaoBT họp 15 phút re: Take Rate — quyết định tăng giá bán hay negotiate TikTok",
+      "owner": "CEO + SaoBT",
+      "deadline": "trước 10:00 hôm nay"
+    },
+    {
+      "priority": 2,
+      "action": "TuND: Deploy 3 creative mới trước 15/04 TikTok Sale để tránh creative fatigue",
+      "owner": "TuND",
+      "deadline": "14/04 EOD"
+    },
+    {
+      "priority": 3,
+      "action": "MaiDN: Confirm booking budget 15/04 Sale — ưu tiên creator có Rate 6s > 35%",
+      "owner": "MaiDN",
+      "deadline": "hôm nay trưa"
+    }
+  ],
+  "data_quality_flags": [
+    "is_mega_day: false — không cần adjust benchmark hôm nay",
+    "ACC Audience data: chưa có trong sheet — TuND check thủ công nếu muốn phân tích reach"
+  ]
+}

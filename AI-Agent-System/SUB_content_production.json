@@ -1,0 +1,145 @@
+{
+  "name": "Hecatech - SUB Content Production (Agent #3)",
+  "nodes": [
+    {
+      "id": "cp-001",
+      "name": "When Called by Main",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "parameters": {}
+    },
+    {
+      "id": "cp-002",
+      "name": "Read Content Brief Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 200],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Content Brief", "mode": "name" },
+        "options": { "headerRow": true }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "cp-003",
+      "name": "Read Top Content Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 400],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Top Content", "mode": "name" },
+        "options": { "headerRow": true, "range": "A1:J30" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "cp-004",
+      "name": "Read Tong Hop MTD",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.2,
+      "position": [440, 600],
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "={{$vars.GOOGLE_SHEET_ID}}", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Tổng hợp", "mode": "name" },
+        "options": { "headerRow": false, "range": "A1:AG20" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CREDENTIAL_ID", "name": "Google Sheets Account" }
+      }
+    },
+    {
+      "id": "cp-005",
+      "name": "Analyze and Build Content Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 400],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ============================================================\n// AGENT #3 — CONTENT & CREATIVE PRODUCTION\n// Tạo content brief tuần mới dựa trên:\n// - Top content tuần trước (views, GMV, CVR)\n// - Metrics hiện tại từ Dashboard\n// - Brief yêu cầu từ team\n// Output: Brief kịch bản + hook ideas → Lark Ads Team group\n// ============================================================\n\nconst today = new Date();\nconst dayOfWeek = today.getDay(); // 0=Sun, 1=Mon\n\n// Chỉ chạy vào thứ Hai — bỏ qua các ngày khác\nif (dayOfWeek !== 1) {\n  return [{ json: { skipped: true, reason: 'Content Production chỉ chạy thứ Hai' } }];\n}\nconst dateStr = today.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });\nconst weekStr = `Tuần ${Math.ceil(today.getDate()/7)} - Tháng ${today.getMonth()+1}/${today.getFullYear()}`;\n\n// Helper\nconst col = (item, idx) => { const obj = item.json||item; return Object.values(obj)[idx]; };\nconst fmt = (n) => {\n  n = parseFloat(n) || 0;\n  if (Math.abs(n)>=1e9) return (n/1e9).toFixed(2)+' tỷ';\n  if (Math.abs(n)>=1e6) return Math.round(n/1e6)+' tr';\n  return Math.round(n).toLocaleString('vi-VN');\n};\nconst pct = (n) => ((parseFloat(n)||0)*100).toFixed(1)+'%';\n\n// --- Read Content Briefs (requests from team) ---\nlet contentBriefs = [];\ntry {\n  contentBriefs = $('Read Content Brief Sheet').all().map(i => i.json).filter(r => {\n    const status = (r['Trạng thái']||r['Status']||'').toLowerCase();\n    return status === 'mới' || status === 'cần làm' || status === 'pending';\n  });\n} catch(e) { contentBriefs = []; }\n\n// --- Read Top Content (best performing videos last 7 days) ---\nlet topContent = [];\ntry {\n  topContent = $('Read Top Content Sheet').all().map(i => i.json).filter(r => r['Video ID'] || r['video_id'] || r['Link']);\n} catch(e) { topContent = []; }\n\n// --- Read MTD Metrics ---\nconst tongHopRows = $('Read Tong Hop MTD').all();\nconst metrics = {};\ntongHopRows.forEach(item => {\n  const name = (col(item, 0)||'').toString().trim();\n  if (name) metrics[name] = parseFloat(col(item, 5)) || 0;\n});\n\n// --- Detect which products need content boost ---\nconst needsBoost = [];\n// Take Rate > 25% = content/funnel problem\nconst takeRate = metrics['Ads/DS (Take Rate)'] || 0;\nif (takeRate > 0.25) needsBoost.push({ reason: `Take Rate cao ${pct(takeRate)} — cần test creative mới giảm CP/DS`, priority: 'HIGH' });\n\n// Net Profit Margin thấp\nconst npm = metrics['Net Profit Margin'] || 0;\nif (npm < 0.10) needsBoost.push({ reason: `Net Profit Margin chỉ ${pct(npm)} — cần video organic + affiliate để giảm phụ thuộc ads`, priority: 'MEDIUM' });\n\n// --- Extract top performing hooks/formats ---\nconst topVideos = topContent.slice(0, 10).map(r => ({\n  title: r['Tiêu đề']||r['Title']||r['title']||'N/A',\n  views: fmt(r['Lượt xem']||r['Views']||r['views']||0),\n  gmv: fmt(r['GMV']||r['gmv']||0),\n  cvr: r['CVR']||r['cvr']||'N/A',\n  hook: r['Hook']||r['hook']||r['Câu hook']||'N/A',\n  product: r['Sản phẩm']||r['Product']||r['product']||'N/A',\n  format: r['Format']||r['format']||r['Dạng video']||'N/A'\n}));\n\n// --- Build week plan context ---\nconst contentContext = {\n  week: weekStr,\n  date: dateStr,\n  metrics: {\n    gmv_mtd: fmt(metrics['Tổng GMV']||0),\n    take_rate: pct(takeRate),\n    net_profit_margin: pct(npm),\n    gmv_ads_mtd: fmt(metrics['GMV Ads']||0)\n  },\n  needs_boost: needsBoost,\n  top_performing_content: topVideos,\n  pending_briefs: contentBriefs.slice(0,5),\n  brands: ['Beucare', 'Retolab'],\n  content_pillars: [\n    'Skincare routine buổi sáng/tối',\n    'Before/After sản phẩm',\n    'Tutorial đúng cách dùng',\n    'So sánh vs đối thủ (nhẹ nhàng)',\n    'Review KOC/KOL authentic',\n    'Livestream highlight + clip ngắn',\n    'Educational: thành phần, công dụng'\n  ]\n};\n\n// --- System + User Prompt for Claude ---\nconst systemPrompt = `Bạn là Creative Director cho Hecatech — công ty TikTok commerce mỹ phẩm VN với 2 brand chính: Beucare và Retolab.\nNhiệm vụ: Tạo Content Brief tuần này cho team Ads/Creative.\nFocus: Video ngắn TikTok, Livestream, và Affiliate content.\nTiêu chí: Hook mạnh trong 3 giây đầu, storytelling authentic, call-to-action rõ ràng.\nViết tiếng Việt, ngắn gọn, actionable — đủ để Creative team bắt tay làm ngay.`;\n\nconst userPrompt = `CONTENT PRODUCTION BRIEF — ${weekStr}\n\nData:\n${JSON.stringify(contentContext, null, 2)}\n\nTạo Content Brief theo format:\n\n🎬 CONTENT BRIEF — ${weekStr}\n\n📊 INSIGHT TỪ DATA\n• Top content tuần trước: [video nào đang win và tại sao]\n• Cơ hội: [gap hoặc trend chưa khai thác]\n\n🎯 MỤC TIÊU TUẦN NÀY\n• KPI: [GMV target từ organic/affiliate]\n• Focus brand: [Beucare/Retolab/cả hai]\n\n📋 CONTENT PLAN (6-8 video)\n\nVideo 1:\n• Hook: \"[câu hook mạnh, max 10 từ]\"\n• Format: [Vertical 9:16 / Duet / Tutorial / Before-After]\n• Script outline: [3-4 bullet points]\n• CTA: [hành động khán giả cần làm]\n• Assign: [Creator/KOC]\n\n[Lặp lại cho Video 2-6]\n\n🔴 URGENT (từ brief của team)\n[Xử lý pending briefs nếu có]\n\n💡 HOOK IDEAS ĐỀ XUẤT\n[5 câu hook để team test A/B]\n1. \n2. \n3. \n4. \n5. \n\n📅 TIMELINE\n• [Ngày] — [Việc cần xong]\n\nDưới 600 từ.`;\n\nreturn [{\n  json: {\n    contentContext,\n    hasContent: topContent.length > 0 || contentBriefs.length > 0,\n    pendingBriefs: contentBriefs.length,\n    claudeRequest: {\n      model: 'claude-sonnet-4-6',\n      max_tokens: 1800,\n      system: systemPrompt,\n      messages: [{ role: 'user', content: userPrompt }]\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "cp-006",
+      "name": "Claude Content Brief Generator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{$vars.ANTHROPIC_API_KEY}}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.claudeRequest)}}"
+      }
+    },
+    {
+      "id": "cp-007",
+      "name": "Format and Route Content Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 400],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const briefText = $input.first().json?.content?.[0]?.text || '⚠️ Lỗi tạo content brief.';\nconst ctx = $('Analyze and Build Content Brief').first().json.contentContext;\n\nconst larkMessage = { msg_type: 'text', content: { text: briefText } };\n\n// Also build a short summary for CEO (just KPIs + urgent items)\nconst summaryLines = briefText.split('\\n').filter(l =>\n  l.includes('KPI') || l.includes('🎯') || l.includes('🔴') || l.includes('📊') || l.includes('URGENT')\n).slice(0, 8).join('\\n');\n\nconst ceoSummary = `📣 CONTENT BRIEF ${ctx.week} đã gửi cho Ads Team.\\n\\nHighlights:\\n${summaryLines}`;\n\nreturn [\n  { json: { url: $vars.LARK_ADS_WEBHOOK_URL,  larkMessage: larkMessage } },\n  { json: { url: $vars.LARK_CEO_WEBHOOK_URL,  larkMessage: { msg_type: 'text', content: { text: ceoSummary } } } }\n];"
+      }
+    },
+    {
+      "id": "cp-008",
+      "name": "Send Content Brief to Lark",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.url}}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{JSON.stringify($json.larkMessage)}}"
+      }
+    },
+    {
+      "id": "cp-009",
+      "name": "Return Content Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 400],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: { contentStatus: 'done', briefSent: true, timestamp: new Date().toISOString() } }];"
+      }
+    }
+  ],
+  "connections": {
+    "When Called by Main":             { "main": [[{ "node": "Read Content Brief Sheet",         "type": "main", "index": 0 }, { "node": "Read Top Content Sheet", "type": "main", "index": 0 }, { "node": "Read Tong Hop MTD", "type": "main", "index": 0 }]] },
+    "Read Content Brief Sheet":        { "main": [[{ "node": "Analyze and Build Content Brief",  "type": "main", "index": 0 }]] },
+    "Read Top Content Sheet":          { "main": [[{ "node": "Analyze and Build Content Brief",  "type": "main", "index": 0 }]] },
+    "Read Tong Hop MTD":               { "main": [[{ "node": "Analyze and Build Content Brief",  "type": "main", "index": 0 }]] },
+    "Analyze and Build Content Brief": { "main": [[{ "node": "Claude Content Brief Generator",   "type": "main", "index": 0 }]] },
+    "Claude Content Brief Generator":  { "main": [[{ "node": "Format and Route Content Brief",   "type": "main", "index": 0 }]] },
+    "Format and Route Content Brief":  { "main": [[{ "node": "Send Content Brief to Lark",       "type": "main", "index": 0 }]] },
+    "Send Content Brief to Lark":      { "main": [[{ "node": "Return Content Status",             "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "hecatech-v1" }
+}
