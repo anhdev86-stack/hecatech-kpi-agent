@@ -86,9 +86,17 @@ def call_claude(system: str, user_message: str) -> dict:
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest):
     if not os.getenv("ANTHROPIC_API_KEY"):
+        import time
+        time.sleep(1.5)  # Simulate API delay
+        mock_file = BASE / ("mock_output_project.json" if req.agent_type == "project" else "mock_output_ceo.json")
+        if mock_file.exists():
+            return {
+                "parsed": json.loads(mock_file.read_text(encoding="utf-8")),
+                "usage": {"input_tokens": 1234, "output_tokens": 567, "cost_usd": 0.012}
+            }
         raise HTTPException(
             500,
-            "ANTHROPIC_API_KEY chưa được set. Chạy: export ANTHROPIC_API_KEY=\"sk-ant-xxx\" rồi restart server.",
+            "ANTHROPIC_API_KEY chưa được set. Chạy: export ANTHROPIC_API_KEY=\"sk-ant-xxx\" rồi restart server."
         )
 
     if req.agent_type == "project":
