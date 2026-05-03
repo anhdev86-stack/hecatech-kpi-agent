@@ -26,9 +26,17 @@ SHEET_ID   = "1VtwiBZb-wq3ZX4ss-lYvcJqfsgZIZhifotu7dszw_m4"
 
 PROJECT_WEBHOOKS = {
     "XKMVN": "https://open.larksuite.com/open-apis/bot/v2/hook/2e6c6bb2-ad5e-4dd0-a8bf-43effb4b0994",
-    # "KTLVN": "https://open.larksuite.com/open-apis/bot/v2/hook/XXXX",
-    # "MNVN":  "https://open.larksuite.com/open-apis/bot/v2/hook/XXXX",
-    # "TDCVN": "https://open.larksuite.com/open-apis/bot/v2/hook/XXXX",
+    "KTLVN": "https://open.larksuite.com/open-apis/bot/v2/hook/12e67bd6-bb59-4ba1-97b1-5c692b66357c",
+    "MNVN": "https://open.larksuite.com/open-apis/bot/v2/hook/0c5022ee-375c-413e-b400-4b3a02d2d31e",
+    "TDCVN": "https://open.larksuite.com/open-apis/bot/v2/hook/c27c9609-35f9-406f-b441-351fc1eb6e7f",
+    "KTMVN": "https://open.larksuite.com/open-apis/bot/v2/hook/c0d15040-a328-4500-9358-97f5a634ac72",
+    "SRMVN": "https://open.larksuite.com/open-apis/bot/v2/hook/877a9dff-f9fd-4b12-8354-d0f7f833250d",
+    "KTMR": "https://open.larksuite.com/open-apis/bot/v2/hook/9e781e8d-9a91-45d7-8c81-09ff41841178",
+    "KTLTL": "https://open.larksuite.com/open-apis/bot/v2/hook/02743e78-30b3-4ecf-9f94-f9576513676f",
+    "XKMMY": "https://open.larksuite.com/open-apis/bot/v2/hook/da40deff-b9e3-44bb-89e3-f4c5bc9a7aad",
+    "XKMTL": "https://open.larksuite.com/open-apis/bot/v2/hook/58f0258e-c09b-4137-9ef5-34e4e9d865d3",
+    "XKMPH": "https://open.larksuite.com/open-apis/bot/v2/hook/2505e7e8-0eb8-4181-bb59-692344df1442",
+    "XKMUS": "https://open.larksuite.com/open-apis/bot/v2/hook/42e47aa1-1a98-4ff2-b40a-596c3fcd01a9",
     # Thêm các dự án khác ở đây...
 }
 
