@@ -86,14 +86,6 @@ def call_claude(system: str, user_message: str) -> dict:
 @app.post("/api/analyze")
 def analyze(req: AnalyzeRequest):
     if not os.getenv("ANTHROPIC_API_KEY"):
-        import time
-        time.sleep(1.5)  # Simulate API delay
-        mock_file = BASE / ("mock_output_project.json" if req.agent_type == "project" else "mock_output_ceo.json")
-        if mock_file.exists():
-            return {
-                "parsed": json.loads(mock_file.read_text(encoding="utf-8")),
-                "usage": {"input_tokens": 1234, "output_tokens": 567, "cost_usd": 0.012}
-            }
         raise HTTPException(
             500,
             "ANTHROPIC_API_KEY chưa được set. Chạy: export ANTHROPIC_API_KEY=\"sk-ant-xxx\" rồi restart server."
@@ -116,15 +108,7 @@ def analyze(req: AnalyzeRequest):
     return call_claude(system, user_msg)
 
 
-@app.get("/api/sample/{agent_type}")
-def get_sample(agent_type: str):
-    mapping = {
-        "project": "sample_data.json",
-        "ceo": "sample_all_projects_outputs.json",
-    }
-    if agent_type not in mapping:
-        raise HTTPException(404, "Unknown agent_type")
-    return json.loads((BASE / mapping[agent_type]).read_text(encoding="utf-8"))
+
 
 
 @app.get("/api/health")
