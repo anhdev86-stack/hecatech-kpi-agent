@@ -2,8 +2,9 @@ name: Group Report (every 3 days)
 
 on:
   schedule:
-    # Chạy hằng ngày lúc 10:00 AM Bangkok (UTC+7) = 03:00 UTC
-    - cron: '0 3 * * *'
+    # Chạy 3 ngày 1 lần lúc 10:00 AM Bangkok (UTC+7) = 03:00 UTC
+    # Ngày 1, 4, 7, 10, 13, 16, 19, 22, 25, 28 mỗi tháng
+    - cron: '0 3 1,4,7,10,13,16,19,22,25,28 * *'
   workflow_dispatch:
 
 env:
