@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 
-SHEET_ID     = "1VtwiBZb-wq3ZX4ss-lYvcJqfsgZIZhifotu7dszw_m4"
-SHEET_GID    = "301205895"
+SHEET_ID     = "1FZj7u5y3TzRogBNkH_KxQflHOv2Dmfrq8p1Nski0Jb4"
+SHEET_GID    = "228758703"
 PROJECT_NAME = "XKMVN"   # ← đổi tên project nếu cần
 LARK_WEBHOOK = "https://open.larksuite.com/open-apis/bot/v2/hook/ad36383c-06b9-48ee-ad3b-08dd771fa9fa"
 

@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
 """
 Hecatech AI Agent — CEO Daily Briefing
-Tổng quan ngắn gọn tất cả dự án, gửi group CEO Lark.
+Đọc sheet "Báo cáo" (gid=228758703), cột J–P → bảng tổng hợp theo thị trường.
 
 Usage:
     python3 run_ceo_report.py             # tự detect giờ
-    python3 run_ceo_report.py morning     # 10:00 — dữ liệu hôm qua
-    python3 run_ceo_report.py afternoon   # 16:00 — dữ liệu hôm nay
+    python3 run_ceo_report.py morning     # 10:00
+    python3 run_ceo_report.py afternoon   # 16:00
 """
 
-import json, os, sys, urllib.request, urllib.error
+import csv, io, json, os, sys, urllib.request, urllib.error
 from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-
-from run_project_report import (
-    fetch_project_sheet, parse_project_metrics,
-    status_from_benchmark, fmt, _get_short_name, _get_vn_weekday,
-    ALERT_METRICS_5, PROJECT_WEBHOOKS,
-)
 
 try:
     from anthropic import Anthropic
@@ -31,10 +25,13 @@ except ImportError:
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 
-SCRIPT_DIR  = Path(__file__).parent
+SHEET_ID    = "1FZj7u5y3TzRogBNkH_KxQflHOv2Dmfrq8p1Nski0Jb4"
+BAOCAO_GID  = "228758703"
 CEO_WEBHOOK = "https://open.larksuite.com/open-apis/bot/v2/hook/ad36383c-06b9-48ee-ad3b-08dd771fa9fa"
 MODEL       = "claude-sonnet-4-6"
-SEP         = "=" * 42
+SEP         = "─" * 44
+
+MARKET_ORDER = ["Tổng", "Beucare", "Retolab", "Thái", "Malay", "Phil"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -48,150 +45,208 @@ def get_mode() -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BUILD SNAPSHOT — tóm tắt 1 dự án
+# FETCH SHEET
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_snapshot(parsed: dict) -> dict:
-    project      = parsed["project"]
-    metrics      = parsed["metrics"]
-    report_dates = parsed.get("report_dates", [])
-    latest_date  = report_dates[0] if report_dates else ""
+def fetch_baocao_sheet() -> list[list[str]]:
+    url = (
+        f"https://docs.google.com/spreadsheets/d/{SHEET_ID}"
+        f"/export?format=csv&gid={BAOCAO_GID}"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8-sig")
+        rows = list(csv.reader(io.StringIO(raw)))
+        return rows
+    except Exception as e:
+        print(f"  ❌ Lỗi fetch sheet: {e}")
+        return []
 
-    # GMV
-    gmv_m   = next((m for m in metrics if "Tổng GMV" in m["name"]), None)
-    gmv_val = gmv_m["daily_values"].get(latest_date, "—") if gmv_m else "—"
 
-    # Net profit margin
-    margin_m = next((m for m in metrics if "Net Profit Margin" in m["name"]), None)
-    margin_val = margin_m["daily_values"].get(latest_date, "—") if margin_m else "—"
-    margin_status = "unknown"
-    if margin_m and margin_val and margin_val not in ("", "0", "—"):
-        margin_status = status_from_benchmark(margin_val, margin_m["benchmark"], margin_m["name"])
+# ─────────────────────────────────────────────────────────────────────────────
+# PARSE
+# ─────────────────────────────────────────────────────────────────────────────
 
-    # 5 key metrics
-    key_metrics = {}
-    for m_name in ALERT_METRICS_5:
-        m = next((x for x in metrics if m_name.lower() in x["name"].lower()), None)
-        if not m:
-            continue
-        short = _get_short_name(m["name"])
-        if short in key_metrics:
-            continue
-        v = m["daily_values"].get(latest_date, "—")
-        s = status_from_benchmark(v, m["benchmark"], m["name"]) if v and v not in ("", "0", "—") else "unknown"
-        key_metrics[short] = {"value": v, "status": s}
+def parse_baocao(rows: list[list[str]]) -> dict:
+    """
+    Header row (index 0): A=date, ..., J=Thị trường, K=Doanh số, L=Chi phí,
+                          M=Lợi nhuận, N=Doanh thu, O=Tỷ lệ, P=CP/DS
+    Data rows (index 1+): cols J–P populated for each market.
+    """
+    if not rows:
+        return {}
 
-    red_list    = [k for k, v in key_metrics.items() if v["status"] == "red"]
-    yellow_list = [k for k, v in key_metrics.items() if v["status"] == "yellow"]
-    overall     = "red" if red_list else "yellow" if yellow_list else "green"
+    header = rows[0]
+    date_str = header[0].strip() if header else ""
 
-    return {
-        "project":       project,
-        "date":          latest_date,
-        "gmv":           gmv_val,
-        "margin":        margin_val,
-        "margin_status": margin_status,
-        "key_metrics":   key_metrics,
-        "red":           red_list,
-        "yellow":        yellow_list,
-        "overall":       overall,
-        "phase":         parsed.get("phase", ""),
-        "target":        parsed.get("target", ""),
+    # Find column indices dynamically from header row
+    col = {
+        "thi_truong": 9,   # J
+        "doanh_so":   10,  # K
+        "chi_phi":    11,  # L
+        "loi_nhuan":  12,  # M
+        "doanh_thu":  13,  # N
+        "ty_le":      14,  # O
+        "cp_ds":      15,  # P
     }
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# RENDER 1 PROJECT BLOCK — ngắn gọn
-# ─────────────────────────────────────────────────────────────────────────────
-
-EMOJI = {"green": "✅", "yellow": "🟡", "red": "🔴", "unknown": ""}
-
-def render_block(snap: dict) -> str:
-    e        = EMOJI.get(snap["overall"], "")
-    wd       = _get_vn_weekday(snap["date"])
-    date_s   = f"{wd} {snap['date'][:5]}" if snap["date"] else "—"
-    gmv_disp = fmt(snap["gmv"]) if snap["gmv"] not in ("—", "", "0") else "—"
-
-    lines = [f"{e} {snap['project']}  |  {date_s}"]
-
-    # Phase/Target nếu có (ngắn gọn)
-    if snap.get("phase") or snap.get("target"):
-        pt = f"{snap.get('phase','')} {snap.get('target','')}".strip()
-        lines.append(f"   {pt}")
-
-    # GMV + margin
-    margin_e = EMOJI.get(snap["margin_status"], "")
-    margin_disp = snap["margin"] if snap["margin"] not in ("—", "", "0") else "—"
-    lines.append(f"   GMV: {gmv_disp}   |   Margin: {margin_disp}{margin_e}")
-
-    # Key metrics chỉ show cái có data và khác xanh
-    alert_parts = []
-    for short, info in snap["key_metrics"].items():
-        v = info["value"]
-        if not v or v in ("", "0", "—"):
+    markets = {}
+    for row in rows[1:]:
+        if len(row) <= col["cp_ds"]:
             continue
-        icon = EMOJI.get(info["status"], "")
-        if info["status"] in ("red", "yellow"):
-            alert_parts.append(f"{short}: {fmt(v)}{icon}")
-    if alert_parts:
-        lines.append(f"   {'  '.join(alert_parts)}")
+        name = row[col["thi_truong"]].strip()
+        if not name or name not in MARKET_ORDER:
+            continue
+        markets[name] = {
+            "doanh_so": row[col["doanh_so"]].strip(),
+            "chi_phi":  row[col["chi_phi"]].strip(),
+            "loi_nhuan": row[col["loi_nhuan"]].strip(),
+            "doanh_thu": row[col["doanh_thu"]].strip(),
+            "ty_le":    row[col["ty_le"]].strip(),
+            "cp_ds":    row[col["cp_ds"]].strip(),
+        }
 
-    # Summary
-    if snap["red"]:
-        lines.append(f"   🚨 Cần xử lý: {', '.join(snap['red'])}")
-    elif snap["yellow"]:
-        lines.append(f"   ⚠️  Theo dõi: {', '.join(snap['yellow'])}")
-    else:
-        lines.append("   ✅ Tất cả xanh")
-
-    return "\n".join(lines)
+    return {"date": date_str, "markets": markets}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AI HEADLINE — 2-3 câu tổng thể cho CEO
+# FORMAT HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
 
-def ai_headline(snapshots: list[dict], mode: str) -> str:
+def _clean_num(s: str) -> str:
+    """Remove quotes and normalize number string."""
+    return s.strip('"').strip("'").strip()
+
+def _fmt_vnd(s: str) -> str:
+    """Format VND number for display."""
+    s = _clean_num(s)
+    if not s or s in ("0", ""):
+        return "—"
+    try:
+        n = int(s.replace(",", "").replace(".", ""))
+        if n >= 1_000_000_000:
+            return f"{n/1_000_000_000:.1f}B"
+        if n >= 1_000_000:
+            return f"{n/1_000_000:.0f}M"
+        return f"{n:,}"
+    except ValueError:
+        return s
+
+def _fmt_pct(s: str) -> str:
+    """Normalize percentage string."""
+    s = _clean_num(s)
+    if not s or s in ("0", "0%", ""):
+        return "—"
+    if "%" not in s:
+        try:
+            return f"{float(s)*100:.2f}%"
+        except ValueError:
+            return s
+    return s.replace(".", ",")
+
+def _get_vn_weekday(date_str: str) -> str:
+    """'04/05' → 'CN 04/05' etc."""
+    days = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+    try:
+        year = datetime.now().year
+        d = datetime.strptime(f"{date_str[:5]}/{year}", "%d/%m/%Y")
+        return f"{days[d.weekday()]} {date_str[:5]}"
+    except Exception:
+        return date_str[:5]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AI HEADLINE
+# ─────────────────────────────────────────────────────────────────────────────
+
+def ai_headline(data: dict) -> str:
     if not HAS_ANTHROPIC:
         return ""
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return ""
 
-    mode_label = "hôm qua (chốt cuối ngày)" if mode == "morning" else "hôm nay (real-time đến giờ này)"
+    markets = data.get("markets", {})
+    tong = markets.get("Tổng", {})
     lines = []
-    for s in snapshots:
-        alerts = []
-        if s["red"]:
-            alerts.append(f"ĐỎ: {', '.join(s['red'])}")
-        if s["yellow"]:
-            alerts.append(f"VÀNG: {', '.join(s['yellow'])}")
-        alert_str = " | ".join(alerts) if alerts else "xanh"
-        gmv = fmt(s["gmv"]) if s["gmv"] not in ("—", "", "0") else "—"
-        lines.append(f"- {s['project']}: GMV={gmv}, Margin={s['margin']}, {alert_str}")
+    for name in MARKET_ORDER:
+        m = markets.get(name)
+        if not m:
+            continue
+        lines.append(
+            f"- {name}: DS={_clean_num(m['doanh_so'])}, CP={_clean_num(m['chi_phi'])}, "
+            f"LN={_clean_num(m['loi_nhuan'])}, CP/DS={_clean_num(m['cp_ds'])}, Tỷ lệ={_clean_num(m['ty_le'])}"
+        )
 
     prompt = f"""Bạn là AI assistant tổng hợp cho CEO Hecatech (TikTok Shop multi-market).
-Dữ liệu {mode_label}:
+Dữ liệu ngày {data.get('date','')}, các thị trường:
 {chr(10).join(lines)}
 
-Viết đúng 3 câu ngắn cho CEO:
-1. Tình trạng chung (x xanh / y vàng / z đỏ — healthy hay cần chú ý)
-2. Dự án/điểm nổi bật nhất (tốt hoặc xấu nhất)
-3. 1 action ưu tiên nhất nếu cần (hoặc "Không có action khẩn" nếu tất cả xanh)
+Viết đúng 3 câu ngắn cho CEO (tiếng Việt có đầy đủ dấu):
+1. Tổng quan doanh số và lợi nhuận toàn công ty
+2. Thị trường nổi bật nhất (tốt hoặc cần chú ý nhất)
+3. 1 khuyến nghị ưu tiên hoặc "Không có vấn đề khẩn cấp" nếu ổn
 
-Tiếng Việt, không markdown, không bullet, không xuống dòng thừa."""
+Tiếng Việt có dấu đầy đủ, không markdown, không bullet, không xuống dòng thừa."""
 
     try:
         client = Anthropic(api_key=api_key)
         resp = client.messages.create(
             model=MODEL,
-            max_tokens=250,
+            max_tokens=200,
             messages=[{"role": "user", "content": prompt}],
         )
         return resp.content[0].text.strip()
     except Exception as e:
-        print(f"   ⚠️ AI headline lỗi: {e}")
+        print(f"  ⚠️ AI headline lỗi: {e}")
         return ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BUILD MESSAGE
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_message(data: dict, headline: str, mode: str) -> str:
+    now      = datetime.now().strftime("%d/%m/%Y %H:%M")
+    icon     = "🌅" if mode == "morning" else "🌆"
+    date_wd  = _get_vn_weekday(data["date"])
+    markets  = data.get("markets", {})
+
+    # Header
+    lines = [
+        f"📈 CEO BRIEFING  {icon}  {now}",
+        f"Dữ liệu ngày: {date_wd}",
+        SEP,
+    ]
+
+    if headline:
+        lines.append(headline)
+        lines.append(SEP)
+
+    # Table header
+    col_w = 9   # name col width
+    lines.append(
+        f"{'Thị trường':<9}  {'Doanh số':>10}  {'Chi phí':>9}  {'CP/DS':>6}  {'Tỷ lệ LN':>8}"
+    )
+    lines.append("─" * 50)
+
+    # Table rows
+    for name in MARKET_ORDER:
+        m = markets.get(name)
+        if not m:
+            continue
+        ds   = _fmt_vnd(m["doanh_so"])
+        cp   = _fmt_vnd(m["chi_phi"])
+        cp_r = _fmt_pct(m["cp_ds"])
+        ty   = _fmt_pct(m["ty_le"])
+        bold = "▶ " if name == "Tổng" else "  "
+        lines.append(
+            f"{bold}{name:<7}  {ds:>10}  {cp:>9}  {cp_r:>6}  {ty:>8}"
+        )
+
+    lines.append(SEP)
+    return "\n".join(lines)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -224,81 +279,43 @@ def send_lark(webhook: str, text: str, label: str = "") -> bool:
 def main():
     mode  = get_mode()
     icon  = "🌅" if mode == "morning" else "🌆"
-    label = "10:00 — Dữ liệu hôm qua" if mode == "morning" else "16:00 — Dữ liệu hôm nay"
     now   = datetime.now().strftime("%d/%m/%Y %H:%M")
+    print(f"\n🚀 CEO BRIEFING | {icon} {now}\n")
 
-    print(f"\n🚀 CEO BRIEFING | {icon} {label}  ({now})\n")
-
-    # 1. Đọc tất cả dự án (n_days=1 — chỉ lấy ngày gần nhất)
-    snapshots = []
-    failed    = []
-    for project in PROJECT_WEBHOOKS:
-        print(f"  📊 [{project}]...", end=" ", flush=True)
-        rows = fetch_project_sheet(project)
-        if not rows:
-            print("❌ skip")
-            failed.append(project)
-            continue
-        parsed = parse_project_metrics(rows, project, n_days=1)
-        if not parsed:
-            print("❌ parse")
-            failed.append(project)
-            continue
-        snap = build_snapshot(parsed)
-        snapshots.append(snap)
-        e = EMOJI.get(snap["overall"], "")
-        gmv = fmt(snap["gmv"]) if snap["gmv"] not in ("—", "", "0") else "—"
-        print(f"{e}  GMV={gmv}")
-
-    if not snapshots:
+    # 1. Fetch
+    print("  📊 Đang lấy dữ liệu sheet Báo cáo...", end=" ", flush=True)
+    rows = fetch_baocao_sheet()
+    if not rows:
         print("❌ Không có dữ liệu")
         return
+    print("✅")
 
-    n_red    = sum(1 for s in snapshots if s["overall"] == "red")
-    n_yellow = sum(1 for s in snapshots if s["overall"] == "yellow")
-    n_green  = sum(1 for s in snapshots if s["overall"] == "green")
-    header_e = "🔴" if n_red >= 3 else "🟡" if n_red >= 1 or n_yellow >= 3 else "🟢"
+    # 2. Parse
+    data = parse_baocao(rows)
+    if not data.get("markets"):
+        print("❌ Không parse được dữ liệu thị trường")
+        return
 
-    # 2. AI headline
+    print(f"  📅 Ngày dữ liệu: {data['date']}")
+    for name in MARKET_ORDER:
+        m = data["markets"].get(name)
+        if m:
+            print(f"     {name}: DS={_fmt_vnd(m['doanh_so'])}  CP={_fmt_vnd(m['chi_phi'])}  CP/DS={_fmt_pct(m['cp_ds'])}")
+
+    # 3. AI headline
     print("\n  🤖 AI headline...", end=" ", flush=True)
-    headline = ai_headline(snapshots, mode)
+    headline = ai_headline(data)
     print("✅" if headline else "skip")
 
-    # 3. Build message
-    lines = []
-    lines.append(f"📈 CEO BRIEFING  {icon}  {now}")
-    lines.append(f"{label}")
-    lines.append(SEP)
-    lines.append(f"{header_e} Tổng {len(snapshots)} dự án: ✅{n_green} xanh  🟡{n_yellow} vàng  🔴{n_red} đỏ")
-
-    if headline:
-        lines.append("")
-        lines.append(headline)
-
-    if failed:
-        lines.append(f"⚠️  Không lấy được data: {', '.join(failed)}")
-
-    # Sắp xếp: đỏ trước, vàng, xanh sau
-    order = {"red": 0, "yellow": 1, "green": 2}
-    snapshots_sorted = sorted(snapshots, key=lambda s: order.get(s["overall"], 3))
-
-    for snap in snapshots_sorted:
-        lines.append("")
-        lines.append(SEP)
-        lines.append(render_block(snap))
-
-    lines.append("")
-    lines.append(SEP)
-
-    msg = "\n".join(lines)
-
-    # 4. Preview + gửi
+    # 4. Build + preview
+    msg = build_message(data, headline, mode)
     print()
     print(msg)
     print()
+
+    # 5. Send
     print("📤 Gửi CEO Lark...")
     send_lark(CEO_WEBHOOK, msg, label=f"CEO [{mode}]")
-
     print("✅ Hoàn tất!")
 
 

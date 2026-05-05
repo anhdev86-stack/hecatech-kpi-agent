@@ -269,6 +269,40 @@ def _parse_section(section_text: str) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# PUBLIC API — load_brain_context (export brain content cho AI)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_brain_context(project_name: str, max_chars: int = 6000) -> str:
+    """Load tất cả brain docs liên quan đến dự án thành 1 string cho Claude."""
+    ifthen_files = _find_ifthen_files(project_name)
+    docs = []
+    total = 0
+
+    for fname in ifthen_files:
+        content = _load_doc(fname)
+        if content and total + len(content) < max_chars:
+            docs.append(f"=== {fname} ===\n{content}")
+            total += len(content)
+
+    # Thêm playbooks chung nếu còn space
+    general_files = [
+        "playbook_take_rate.md",
+        "playbook_creative_rotation.md",
+        "funnel_04_quick_action.md",
+        "funnel_05_impressions.md",
+    ]
+    for fname in general_files:
+        if total >= max_chars:
+            break
+        content = _load_doc(fname)
+        if content and total + len(content) < max_chars:
+            docs.append(f"=== {fname} ===\n{content}")
+            total += len(content)
+
+    return "\n\n".join(docs)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # PUBLIC API — get_advice (tra cứu brain → trả về advice)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -359,13 +393,13 @@ def detect_issues(project: dict) -> list[str]:
     """Phát hiện các vấn đề của 1 dự án dựa trên số liệu."""
     issues = []
 
-    cp_ds  = project.get("cp_ds", 0)       # Chi phí / Doanh số %
-    ln     = project.get("ln_day", 0)       # Lợi nhuận ngày
-    ds     = project.get("ds_day", 0)       # Doanh số ngày
-    thr_r  = project.get("thr_red", 0)      # Ngưỡng đỏ
-    thr_g  = project.get("thr_green", 0)    # Ngưỡng xanh
-    ty_le  = project.get("ty_le", 0)        # % lợi nhuận MTD
-    status = project.get("status", "")
+    cp_ds  = project.get("cp_ds", 0) or 0
+    ln     = project.get("ln_day", 0) or 0
+    ds     = project.get("ds_day", 0) or 0
+    thr_r  = project.get("thr_red", 0) or 0
+    thr_g  = project.get("thr_green", 0) or 0
+    ty_le  = project.get("ty_le", 0) or 0
+    status = project.get("status", "") or ""
 
     # Take rate / chi phí cao
     if cp_ds > 40:
