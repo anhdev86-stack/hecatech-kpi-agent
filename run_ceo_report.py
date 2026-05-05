@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-Hecatech AI Agent — CEO Daily Briefing
+Hecatech AI Agent — CEO Daily Briefing (09:00)
 Đọc sheet "Báo cáo" (gid=228758703), cột J–P → bảng tổng hợp theo thị trường.
 
 Usage:
-    python3 run_ceo_report.py             # tự detect giờ
-    python3 run_ceo_report.py morning     # 10:00
-    python3 run_ceo_report.py afternoon   # 16:00
+    python3 run_ceo_report.py
 """
 
 import csv, io, json, os, sys, urllib.request, urllib.error
@@ -32,16 +30,6 @@ MODEL       = "claude-sonnet-4-6"
 SEP         = "─" * 44
 
 MARKET_ORDER = ["Tổng", "Beucare", "Retolab", "Thái", "Malay", "Phil"]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MODE
-# ─────────────────────────────────────────────────────────────────────────────
-
-def get_mode() -> str:
-    if len(sys.argv) > 1 and sys.argv[1] in ("morning", "afternoon"):
-        return sys.argv[1]
-    return "morning" if datetime.now().hour < 13 else "afternoon"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -240,38 +228,6 @@ def _build_table(data: dict) -> str:
     return "\n".join(lines)
 
 
-def build_card(data: dict, headline: str, mode: str) -> dict:
-    """Build Lark interactive card payload — renders code block in monospace."""
-    now     = datetime.now().strftime("%d/%m/%Y %H:%M")
-    icon    = "🌅" if mode == "morning" else "🌆"
-    date_wd = _get_vn_weekday(data["date"])
-    table   = _build_table(data)
-
-    subtitle = f"Ngay du lieu: {date_wd}"
-    if headline:
-        subtitle += f"\n\n{headline}"
-
-    elements = [
-        {
-            "tag": "div",
-            "text": {"tag": "lark_md", "content": subtitle},
-        },
-        {
-            "tag": "div",
-            "text": {"tag": "lark_md", "content": f"```\n{table}\n```"},
-        },
-    ]
-
-    return {
-        "msg_type": "interactive",
-        "card": {
-            "header": {
-                "title": {"tag": "plain_text", "content": f"📈 CEO BRIEFING  {icon}  {now}"},
-                "template": "blue",
-            },
-            "elements": elements,
-        },
-    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -304,10 +260,8 @@ def send_lark(webhook: str, payload: dict, label: str = "") -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
-    mode  = get_mode()
-    icon  = "🌅" if mode == "morning" else "🌆"
-    now   = datetime.now().strftime("%d/%m/%Y %H:%M")
-    print(f"\n🚀 CEO BRIEFING | {icon} {now}\n")
+    now = datetime.now().strftime("%d/%m/%Y %H:%M")
+    print(f"\n🚀 CEO BRIEFING | {now}\n")
 
     # 1. Fetch
     print("  📊 Đang lấy dữ liệu sheet Báo cáo...", end=" ", flush=True)
@@ -335,16 +289,12 @@ def main():
     print("✅" if headline else "skip")
 
     # 4. Build + preview
-    now     = datetime.now().strftime("%d/%m/%Y %H:%M")
-    icon    = "🌅" if mode == "morning" else "🌆"
     date_wd = _get_vn_weekday(data["date"])
     table   = _build_table(data)
-    lines   = [f"📈 CEO BRIEFING  {icon}  {now}", f"Ngay du lieu: {date_wd}", ""]
+    lines   = [f"📈 CEO BRIEFING  🌅  {now}", f"Ngay du lieu: {date_wd}", ""]
     if headline:
         lines += [headline, ""]
-    lines.append("```")
-    lines.append(table)
-    lines.append("```")
+    lines += ["```", table, "```"]
     msg = "\n".join(lines)
     print()
     print(msg)
@@ -352,7 +302,7 @@ def main():
 
     # 5. Send
     print("📤 Gửi CEO Lark...")
-    send_lark(CEO_WEBHOOK, msg, label=f"CEO [{mode}]")
+    send_lark(CEO_WEBHOOK, msg, label="CEO [9:00]")
     print("✅ Hoàn tất!")
 
 
