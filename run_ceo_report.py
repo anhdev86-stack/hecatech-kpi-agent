@@ -225,11 +225,10 @@ def build_message(data: dict, headline: str, mode: str) -> str:
         lines.append(SEP)
 
     # Table header
-    col_w = 9   # name col width
     lines.append(
-        f"{'Thị trường':<9}  {'Doanh số':>10}  {'Chi phí':>9}  {'CP/DS':>6}  {'Tỷ lệ LN':>8}"
+        f"{'Thị trường':<9} | {'Doanh số':>10} | {'Chi phí':>9} | {'CP/DS':>6} | {'Tỷ lệ LN':>8}"
     )
-    lines.append("─" * 50)
+    lines.append("=" * 56)
 
     # Table rows
     for name in MARKET_ORDER:
@@ -240,10 +239,12 @@ def build_message(data: dict, headline: str, mode: str) -> str:
         cp   = _fmt_vnd(m["chi_phi"])
         cp_r = _fmt_pct(m["cp_ds"])
         ty   = _fmt_pct(m["ty_le"])
-        bold = "▶ " if name == "Tổng" else "  "
+        prefix = "▶ " if name == "Tổng" else "  "
         lines.append(
-            f"{bold}{name:<7}  {ds:>10}  {cp:>9}  {cp_r:>6}  {ty:>8}"
+            f"{prefix}{name:<7} | {ds:>10} | {cp:>9} | {cp_r:>6} | {ty:>8}"
         )
+        if name == "Tổng":
+            lines.append("─" * 56)
 
     lines.append(SEP)
     return "\n".join(lines)
