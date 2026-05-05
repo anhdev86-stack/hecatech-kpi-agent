@@ -233,9 +233,8 @@ def status_from_benchmark(value_str: str, bench_str: str, metric_name: str) -> s
 
 def _find_recent_data_cols(date_cols: dict, gmv_row: list, n_days: int = 3) -> list[tuple]:
     """
-    Tìm n_days cột NGÀY GẦN NHẤT không vượt quá ngày hiện tại.
-    Lọc bỏ các ngày trong tương lai (future dates từ sheet pre-populated).
-    Trả về list[(col_idx, date_str)] — mới nhất trước.
+    Tìm n_days cột ngày hoàn chỉnh GẦN NHẤT — luôn loại trừ hôm nay.
+    VD: chạy ngày 06/05 → lấy 05/05, 04/05, 03/05.
     """
     today = datetime.now().date()
     valid_cols = []
@@ -243,14 +242,12 @@ def _find_recent_data_cols(date_cols: dict, gmv_row: list, n_days: int = 3) -> l
         try:
             year = datetime.now().year
             d = datetime.strptime(f"{date_str[:5]}/{year}", "%d/%m/%Y").date()
-            # Nếu ngày parse ra > 6 tháng so với today, thử năm trước
             if d > today and (d - today).days > 180:
                 d = datetime.strptime(f"{date_str[:5]}/{year-1}", "%d/%m/%Y").date()
-            if d <= today:
+            if d < today:  # chỉ lấy ngày trước hôm nay (ngày đã hoàn chỉnh)
                 valid_cols.append((col_idx, date_str, d))
         except Exception:
             continue
-    # Sắp xếp theo ngày giảm dần (mới nhất trước)
     valid_cols.sort(key=lambda x: x[2], reverse=True)
     return [(col_idx, date_str) for col_idx, date_str, _ in valid_cols[:n_days]]
 
