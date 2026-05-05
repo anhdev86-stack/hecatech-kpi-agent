@@ -1,32 +1,23 @@
-# 📊 BẢNG GIÁM SÁT RỦI RO — DASHBOARD XKMMY
+# IF-THEN XKMMY
 
-> Ngày 23/04/2026 | Dự án: TikTok Shop Hecatech — XKMMY (Xịt khử mùi Malaysia) | Nguồn: Dashboard T04.2026
-
-> 📝 TÓM TẮT TÌNH TRẠNG
-
-> 9 chỉ số 🔴 đồng loạt (CPM, CPA, ROAS, Take Rate, Tỷ lệ GMV từ Ads, Net Margin, Video Self-produced, Creative format, Tỷ lệ giá vốn) — vấn đề cốt lõi là CPM 253K cao gấp 1.7x ngưỡng, kéo theo Imp co, Đơn sụp, CPA 226K, ROAS 1.74x. Khác biệt căn bản với TDCVN vì MY không có Live/Booking/AFF Live để cứu và creative pool đã cạn (0 video tự sản xuất + AFF mới = 0 suốt 5 ngày).
-
-> ⚠️ VÒNG LẶP NGUY HIỂM ĐANG HOẠT ĐỘNG
-
-> 🔥 LOOP 1 — CPM EXPLOSION (gốc rễ)
-
-> 🩸 LOOP 2 — CREATIVE DEATH (bom hẹn giờ 2-3 tuần)
-
-> 🏚 LOOP 3 — ADS DEPENDENCY (cấu trúc)
-
+📊 BẢNG GIÁM SÁT RỦI RO — DASHBOARD XKMMY
 Ngày 23/04/2026 | Dự án: TikTok Shop Hecatech — XKMMY (Xịt khử mùi Malaysia) | Nguồn: Dashboard T04.2026
+
 📝 TÓM TẮT TÌNH TRẠNG
 9 chỉ số 🔴 đồng loạt (CPM, CPA, ROAS, Take Rate, Tỷ lệ GMV từ Ads, Net Margin, Video Self-produced, Creative format, Tỷ lệ giá vốn) — vấn đề cốt lõi là CPM 253K cao gấp 1.7x ngưỡng, kéo theo Imp co, Đơn sụp, CPA 226K, ROAS 1.74x. Khác biệt căn bản với TDCVN vì MY không có Live/Booking/AFF Live để cứu và creative pool đã cạn (0 video tự sản xuất + AFF mới = 0 suốt 5 ngày).
+
 ⚠️ VÒNG LẶP NGUY HIỂM ĐANG HOẠT ĐỘNG
 🔥 LOOP 1 — CPM EXPLOSION (gốc rễ) | CPM↑ (253K) → Imp↓ (12-24K/ngày) → Clicks↓ → Đơn↓ (14/ngày) → CPA↑ (226K) → ROAS↓ (1.74x) → phản xạ nâng ROI floor (SAI) → tệp co → CPM↑↑
 🩸 LOOP 2 — CREATIVE DEATH (bom hẹn giờ 2-3 tuần) | Video tự SX = 0 + AFF mới = 0 từ 19/04 → pool fatigue → CTR giảm 45% trong 10 ngày (7.48% → 4.07%) → Rate 6s↓ → thuật toán phạt → CPM↑ → Loop 1 tệ hơn
 🏚 LOOP 3 — ADS DEPENDENCY (cấu trúc) | Tỷ lệ GMV từ Ads 99.7% → Take Rate 57.6% → Net Margin -33.25% → cash flow âm → không dám tăng budget breakout → KHÔNG có Live/AFF/Booking để cứu
+
 🚨 RỦI RO CẤU TRÚC THỊ TRƯỜNG MY (tách riêng khỏi vấn đề vận hành)
 • Livestream GMV = 0 — chưa triển khai tại MY → mất 1 kênh doanh số lớn
 • Booking KOL/KOC tạm dừng — 0 creator active, 0 KOL booking suốt 10 ngày
 • Affiliate Live GMV = 0 — chưa có team Live Creator MY
 • AFF Video mới = 0 từ 19/04 (5 ngày liền) → video AFF cũ sẽ hết hạn → sụp AFF Video GMV 30-50% trong 2 tuần (cùng lộ trình TDCVN đã trải qua)
 • Hệ quả cấu trúc: Tỷ lệ GMV từ Ads 99.7% (vs TDCVN 93.76%) → MY phụ thuộc MỘT KÊNH DUY NHẤT = rủi ro hệ thống, không phải rủi ro vận hành
+
 Chỉ số | Giá trị hiện tại & Trạng thái | Khoảng cách đến 🔴 | Mức rủi ro | Hành động phòng ngừa (IF tụt 🔴 → THEN...) | Owner
 NHÓM 1: RỦI RO CỰC CAO — Đã 🔴 hoặc bị kéo bởi upstream 🔴
 1.0 | CPM Quảng cáo | ~253K VND 
@@ -203,6 +194,7 @@ Dao động 36.6-78.8% — trụ cột GMV MY | TRUNG BÌNH | ① ⚠️ Đây l
 Đã chạm  8.33% (15/04) 1 lần | TRUNG BÌNH | ① Pull reason hoàn hàng tháng — fix root cause (SP, shipping, đóng gói)
 ② Rating feedback loop: hoàn↑ → Review★↓ → Imp Thẻ SP↓
 ③ KPI cảnh báo: Hoàn >3% 2 ngày liền → audit chất lượng SP + đóng gói MY
+
 🎯 QUICK WIN — 3 HÀNH ĐỘNG CẦN LÀM TRONG 48H TỚI (đến hết 25/04/2026)
 # | Hành động | Mô tả chi tiết | Owner | Deadline
 1.0 | 1. REACTIVATE AFF BOOKING MY
