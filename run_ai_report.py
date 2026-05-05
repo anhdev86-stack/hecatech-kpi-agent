@@ -43,10 +43,10 @@ except ImportError:
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 
-SHEET_ID      = "1VtwiBZb-wq3ZX4ss-lYvcJqfsgZIZhifotu7dszw_m4"
+SHEET_ID      = "1FZj7u5y3TzRogBNkH_KxQflHOv2Dmfrq8p1Nski0Jb4"
 LARK_WEBHOOK  = "https://open.larksuite.com/open-apis/bot/v2/hook/ad36383c-06b9-48ee-ad3b-08dd771fa9fa"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-MODEL         = "claude-sonnet-4-5"
+MODEL         = "claude-sonnet-4-6"
 SCRIPT_DIR    = Path(__file__).parent
 PROMPT_FILE   = SCRIPT_DIR / "prompt_system.md"
 

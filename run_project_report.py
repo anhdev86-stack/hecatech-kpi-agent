@@ -465,27 +465,30 @@ def ai_analyze_project(parsed: dict) -> dict | None:
 
     def _build_prompt(metrics_txt: str, brain_txt: str) -> str:
         return f"""Bạn là AI analyst của Hecatech — TikTok Shop performance marketing.
-Phân tích số liệu và tạo báo cáo Lark NGẮN GỌN.
+Phân tích số liệu dự án và tạo báo cáo gửi group Lark.
 
 DỰ ÁN: {project} | {header_dates}
 
 SỐ LIỆU:
 {metrics_txt}
 
-PLAYBOOK:
+PLAYBOOK IF-THEN:
 {brain_txt}
 
 ---
 Trả về JSON thuần (không markdown, không code block, không xuống dòng trong string):
-{{"summary": "1 câu tình trạng + số liệu nổi bật nhất",
-"warning": "1 câu cảnh báo quan trọng nhất hoặc để trống nếu xanh",
-"actions": ["Hành động 1 — owner", "Hành động 2 — owner"],
-"owner": "owner chính"}}
+{{"summary": "1-2 câu tóm tắt tình trạng — có số liệu cụ thể, nêu chỉ số đỏ/vàng nổi bật nhất",
+"issues": ["Vấn đề 1: tên chỉ số + giá trị + xu hướng + nguyên nhân ngắn", "Vấn đề 2", "Vấn đề 3"],
+"warning": "1 câu cảnh báo cụ thể — nêu rủi ro, forecast tác động nếu không xử lý. Để trống nếu xanh hết.",
+"actions": ["Hành động cụ thể 1 — deadline — owner", "Hành động 2 — owner", "Hành động 3 — owner"],
+"owner": "tên owner chính"}}
 
 NGUYÊN TẮC:
-- Tiếng Việt CÓ DẤU đầy đủ. KHÔNG dùng emoji trong JSON string
-- Mỗi field tối đa 1 câu ngắn. Nếu xanh hết: warning="", actions=[]
-- Hành động bám playbook, không trích tên file, không bịa"""
+- TOÀN BỘ output PHẢI viết tiếng Việt CÓ DẤU. Ví dụ: "tắt" không phải "tat", "hàng" không phải "hang", "trên" không phải "tren", "dưới" không phải "duoi", "tuần" không phải "tuan"
+- KHÔNG dùng emoji trong JSON string
+- issues tối đa 3, actions tối đa 3. Nếu xanh hết: issues=[], warning="", actions=[]
+- Hành động bám sát playbook IF-THEN — cụ thể, có owner, không bịa
+- Không trích dẫn tên file"""
 
     def _parse_ai_response(text: str) -> dict | None:
         text = text.strip()
@@ -502,7 +505,7 @@ NGUYÊN TẮC:
     try:
         prompt1 = _build_prompt(metrics_text_clean, brain_content)
         resp = client.messages.create(
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-6",
             max_tokens=1800,
             messages=[{"role": "user", "content": prompt1}],
         )
@@ -516,7 +519,7 @@ NGUYÊN TẮC:
         short_metrics = "\n".join(metrics_text_clean.splitlines()[:20])
         prompt2 = _build_prompt(short_metrics, short_brain)
         resp2 = client.messages.create(
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-6",
             max_tokens=1200,
             messages=[{"role": "user", "content": prompt2}],
         )
@@ -530,8 +533,10 @@ def render_project_report(parsed: dict, mode: str) -> str:
     project      = parsed["project"]
     metrics      = parsed["metrics"]
     report_dates = parsed.get("report_dates", [])
+    phase        = parsed.get("phase", "")
+    target       = parsed.get("target", "")
 
-    # Dates header: "T4 28/04, T5 29/04"
+    # Dates: cũ → mới
     date_labels = [f"{_get_vn_weekday(d)} {d[:5]}" for d in reversed(report_dates)]
     header_dates = ", ".join(date_labels)
 
@@ -539,23 +544,28 @@ def render_project_report(parsed: dict, mode: str) -> str:
     print(f"   🤖 Đang phân tích AI...")
     ai = ai_analyze_project(parsed)
 
-    # ── Dòng 1: header ──────────────────────────────────────────────────────
-    lines = [f"📊 {project}  |  {header_dates}"]
+    # ── Header ──────────────────────────────────────────────────────────────
+    lines = [f"📊 {project} — Báo cáo | {header_dates}"]
 
-    # ── Dòng 2: AI summary (1 câu) ──────────────────────────────────────────
-    if ai and ai.get("summary"):
-        lines.append(ai["summary"])
+    if phase or target:
+        pt = f"{phase} | {target}".strip(" |")
+        lines.append(pt)
 
     lines.append("")
 
-    # ── Metrics: GMV + 5 chỉ số phễu (inline, compact) ─────────────────────
+    # ── AI summary ──────────────────────────────────────────────────────────
+    if ai and ai.get("summary"):
+        lines.append(ai["summary"])
+        lines.append("")
+
+    # ── GMV ─────────────────────────────────────────────────────────────────
     gmv_m = next((m for m in metrics if "Tổng GMV" in m["name"]), None)
     if gmv_m:
         vals = [fmt(gmv_m["daily_values"].get(d, "—")) for d in reversed(report_dates)]
         lines.append(f"GMV: {' | '.join(vals)}")
 
+    # ── 5 KPI metrics — mỗi ngày có icon ────────────────────────────────────
     seen_short = set()
-    kpi_parts = []
     for m_name in ALERT_METRICS_5:
         m = next((m for m in metrics if m_name.lower() in m["name"].lower()), None)
         if not m:
@@ -564,30 +574,42 @@ def render_project_report(parsed: dict, mode: str) -> str:
         if short in seen_short:
             continue
         seen_short.add(short)
-        # Chỉ lấy ngày mới nhất + icon
-        latest_date = report_dates[0] if report_dates else ""
-        v = m["daily_values"].get(latest_date, "—")
-        icon = ""
-        if v and v not in ("0", "—", ""):
-            s = status_from_benchmark(v, m["benchmark"], m["name"])
-            icon = {"green": "✅", "yellow": "🟡", "red": "🔴"}.get(s, "")
-        kpi_parts.append(f"{short}: {fmt(v)}{icon}")
-    if kpi_parts:
-        lines.append("  ".join(kpi_parts))
 
-    # ── Warning + Actions ────────────────────────────────────────────────────
+        day_parts = []
+        for d in reversed(report_dates):
+            v = m["daily_values"].get(d, "—")
+            icon = ""
+            if v and v not in ("0", "—", ""):
+                s = status_from_benchmark(v, m["benchmark"], m["name"])
+                icon = {"green": "✅", "yellow": "🟡", "red": "🔴"}.get(s, "")
+            day_parts.append(f"{fmt(v)}{icon}")
+        lines.append(f"• {short}: {' → '.join(day_parts)}")
+
+    lines.append("")
+
+    # ── Analysis ─────────────────────────────────────────────────────────────
     if ai:
+        issues_list  = ai.get("issues", [])
         warning_text = ai.get("warning", "")
         actions_list = ai.get("actions", [])
         owner        = ai.get("owner", "Team")
 
+        if issues_list:
+            lines.append("🔍 Vấn đề:")
+            for i, iss in enumerate(issues_list, 1):
+                lines.append(f"{i}. {iss}")
+            lines.append("")
+
         if warning_text:
-            lines.append(f"\n⚠️ {warning_text}")
+            lines.append(f"🚨🚨 CẢNH BÁO: {warning_text}")
+            lines.append("")
 
         if actions_list:
-            lines.append(f"→ " + f"\n→ ".join(actions_list[:2]))
-        elif not warning_text:
-            lines.append("✅ Xanh — duy trì vận hành.")
+            lines.append(f"✅ Hành động (@{owner}):")
+            for i, act in enumerate(actions_list, 1):
+                lines.append(f"{i}. {act}")
+        elif not issues_list:
+            lines.append("✅ Tất cả chỉ số xanh — duy trì vận hành.")
 
     else:
         # Fallback rule-based
@@ -605,15 +627,22 @@ def render_project_report(parsed: dict, mode: str) -> str:
 
         if all_advice:
             critical = all_advice[0]
-            lines.append(f"\n⚠️ {critical.get('root_cause', '—')}")
+            lines.append("🔍 Vấn đề:")
+            for i, adv in enumerate(all_advice[:3], 1):
+                lines.append(f"{i}. {adv.get('root_cause', '—')}")
+            lines.append("")
+            lines.append(f"🚨🚨 CẢNH BÁO: Rủi ro {critical.get('risk_level', 'CAO')}. {critical.get('root_cause', '')}")
+            lines.append("")
+            lines.append(f"✅ Hành động (@{all_advice[0].get('owner', 'Team')}):")
             acts = []
             for adv in all_advice:
                 for act in adv.get("actions", []):
                     if act not in acts:
                         acts.append(act)
-            lines.append("→ " + f"\n→ ".join(acts[:2]))
+            for i, act in enumerate(acts[:3], 1):
+                lines.append(f"{i}. {act}")
         else:
-            lines.append("✅ Xanh — duy trì vận hành.")
+            lines.append("✅ Tất cả chỉ số xanh — duy trì vận hành.")
 
     return "\n".join(lines)
 

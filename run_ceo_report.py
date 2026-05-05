@@ -33,7 +33,7 @@ except ImportError:
 
 SCRIPT_DIR  = Path(__file__).parent
 CEO_WEBHOOK = "https://open.larksuite.com/open-apis/bot/v2/hook/ad36383c-06b9-48ee-ad3b-08dd771fa9fa"
-MODEL       = "claude-sonnet-4-5"
+MODEL       = "claude-sonnet-4-6"
 SEP         = "=" * 42
 
 
