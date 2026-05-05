@@ -208,15 +208,38 @@ Tiếng Việt có dấu đầy đủ, không markdown, không bullet, không xu
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_message(data: dict, headline: str, mode: str) -> str:
-    now      = datetime.now().strftime("%d/%m/%Y %H:%M")
-    icon     = "🌅" if mode == "morning" else "🌆"
-    date_wd  = _get_vn_weekday(data["date"])
-    markets  = data.get("markets", {})
+    now     = datetime.now().strftime("%d/%m/%Y %H:%M")
+    icon    = "🌅" if mode == "morning" else "🌆"
+    date_wd = _get_vn_weekday(data["date"])
+    markets = data.get("markets", {})
 
-    # Header
+    # Pre-render all values
+    COL_HEADERS = ("Thi truong", "DS", "CP", "CP/DS", "Ty le")
+    rows_data = []
+    for name in MARKET_ORDER:
+        m = markets.get(name)
+        if not m:
+            continue
+        rows_data.append((
+            name,
+            _fmt_vnd(m["doanh_so"]),
+            _fmt_vnd(m["chi_phi"]),
+            _fmt_pct(m["cp_ds"]),
+            _fmt_pct(m["ty_le"]),
+        ))
+
+    # Compute column widths from actual data
+    w = [max(len(COL_HEADERS[i]), max(len(r[i]) for r in rows_data)) for i in range(5)]
+
+    def row_str(r, sep=" | "):
+        return f"{r[0]:<{w[0]}}{sep}{r[1]:>{w[1]}}{sep}{r[2]:>{w[2]}}{sep}{r[3]:>{w[3]}}{sep}{r[4]:>{w[4]}}"
+
+    divider = "-+-".join("-" * c for c in w)
+
+    # Build message
     lines = [
         f"📈 CEO BRIEFING  {icon}  {now}",
-        f"Dữ liệu ngày: {date_wd}",
+        f"Ngay: {date_wd}",
         SEP,
     ]
 
@@ -224,27 +247,13 @@ def build_message(data: dict, headline: str, mode: str) -> str:
         lines.append(headline)
         lines.append(SEP)
 
-    # Table header
-    lines.append(
-        f"{'Thị trường':<9} | {'Doanh số':>10} | {'Chi phí':>9} | {'CP/DS':>6} | {'Tỷ lệ LN':>8}"
-    )
-    lines.append("=" * 56)
+    lines.append(row_str(COL_HEADERS))
+    lines.append(divider)
 
-    # Table rows
-    for name in MARKET_ORDER:
-        m = markets.get(name)
-        if not m:
-            continue
-        ds   = _fmt_vnd(m["doanh_so"])
-        cp   = _fmt_vnd(m["chi_phi"])
-        cp_r = _fmt_pct(m["cp_ds"])
-        ty   = _fmt_pct(m["ty_le"])
-        prefix = "▶ " if name == "Tổng" else "  "
-        lines.append(
-            f"{prefix}{name:<7} | {ds:>10} | {cp:>9} | {cp_r:>6} | {ty:>8}"
-        )
-        if name == "Tổng":
-            lines.append("─" * 56)
+    for r in rows_data:
+        lines.append(row_str(r))
+        if r[0] == "Tong" or r[0] == "Tổng":
+            lines.append(divider)
 
     lines.append(SEP)
     return "\n".join(lines)
