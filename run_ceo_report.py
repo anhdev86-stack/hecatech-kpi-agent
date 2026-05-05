@@ -279,6 +279,9 @@ def build_card(data: dict, headline: str, mode: str) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def send_lark(webhook: str, payload: dict, label: str = "") -> bool:
+    # Accept either a full payload dict or a plain text string
+    if isinstance(payload, str):
+        payload = {"msg_type": "text", "content": {"text": payload}}
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req     = urllib.request.Request(
         webhook, data=data,
@@ -332,14 +335,24 @@ def main():
     print("✅" if headline else "skip")
 
     # 4. Build + preview
-    card = build_card(data, headline, mode)
+    now     = datetime.now().strftime("%d/%m/%Y %H:%M")
+    icon    = "🌅" if mode == "morning" else "🌆"
+    date_wd = _get_vn_weekday(data["date"])
+    table   = _build_table(data)
+    lines   = [f"📈 CEO BRIEFING  {icon}  {now}", f"Ngay du lieu: {date_wd}", ""]
+    if headline:
+        lines += [headline, ""]
+    lines.append("```")
+    lines.append(table)
+    lines.append("```")
+    msg = "\n".join(lines)
     print()
-    print(_build_table(data))
+    print(msg)
     print()
 
     # 5. Send
     print("📤 Gửi CEO Lark...")
-    send_lark(CEO_WEBHOOK, card, label=f"CEO [{mode}]")
+    send_lark(CEO_WEBHOOK, msg, label=f"CEO [{mode}]")
     print("✅ Hoàn tất!")
 
 
