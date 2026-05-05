@@ -461,30 +461,34 @@ def ai_analyze_project(parsed: dict) -> dict | None:
     metrics_text_clean = emoji_pattern.sub("", metrics_text)
 
     def _build_prompt(metrics_txt: str, brain_txt: str) -> str:
+        brain_section = f"""TÀI LIỆU IF-THEN (BỘ NÃO):
+{brain_txt}
+
+QUAN TRỌNG: Mọi đề xuất hành động PHẢI lấy từ tài liệu IF-THEN ở trên. Không được tự sáng tạo hành động từ kiến thức chung. Nếu không tìm thấy hướng dẫn trong tài liệu trên, ghi rõ "Chưa có playbook cho tình huống này".""" if brain_txt.strip() else "TÀI LIỆU IF-THEN: Chưa có — không đề xuất hành động cụ thể."
+
         return f"""Bạn là AI analyst của Hecatech — TikTok Shop performance marketing.
-Phân tích số liệu dự án và tạo báo cáo gửi group Lark.
+Nhiệm vụ: phân tích số liệu và tra cứu TÀI LIỆU IF-THEN bên dưới để đưa ra hành động CỤ THỂ.
 
 DỰ ÁN: {project} | {header_dates}
 
-SỐ LIỆU:
+SỐ LIỆU THỰC TẾ:
 {metrics_txt}
 
-PLAYBOOK IF-THEN:
-{brain_txt}
+{brain_section}
 
 ---
 Trả về JSON thuần (không markdown, không code block, không xuống dòng trong string):
 {{"summary": "1-2 câu tóm tắt tình trạng — có số liệu cụ thể, nêu chỉ số đỏ/vàng nổi bật nhất",
-"issues": ["Vấn đề 1: tên chỉ số + giá trị + xu hướng + nguyên nhân ngắn", "Vấn đề 2", "Vấn đề 3"],
-"warning": "1 câu cảnh báo cụ thể — nêu rủi ro, forecast tác động nếu không xử lý. Để trống nếu xanh hết.",
-"actions": ["Hành động cụ thể 1 — deadline — owner", "Hành động 2 — owner", "Hành động 3 — owner"],
-"owner": "tên owner chính"}}
+"issues": ["Vấn đề 1: tên chỉ số + giá trị + xu hướng + nguyên nhân từ IF-THEN", "Vấn đề 2", "Vấn đề 3"],
+"warning": "1 câu cảnh báo cụ thể — rủi ro nếu không xử lý. Để trống nếu xanh hết.",
+"actions": ["Hành động cụ thể từ IF-THEN — deadline — owner", "Hành động 2 — owner", "Hành động 3 — owner"],
+"owner": "tên owner chính từ IF-THEN"}}
 
-NGUYÊN TẮC:
-- TOÀN BỘ output PHẢI viết tiếng Việt CÓ DẤU. Ví dụ: "tắt" không phải "tat", "hàng" không phải "hang", "trên" không phải "tren", "dưới" không phải "duoi", "tuần" không phải "tuan"
+NGUYÊN TẮC BẮT BUỘC:
+- TOÀN BỘ output PHẢI tiếng Việt CÓ DẤU đầy đủ. TUYỆT ĐỐI không viết: "tat", "hang", "tren", "duoi", "tuan", "ngay", "bat"
 - KHÔNG dùng emoji trong JSON string
 - issues tối đa 3, actions tối đa 3. Nếu xanh hết: issues=[], warning="", actions=[]
-- Hành động bám sát playbook IF-THEN — cụ thể, có owner, không bịa
+- Hành động PHẢI lấy từ tài liệu IF-THEN, ghi rõ owner và deadline theo tài liệu
 - Không trích dẫn tên file"""
 
     def _parse_ai_response(text: str) -> dict | None:

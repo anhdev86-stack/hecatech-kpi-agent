@@ -40,6 +40,8 @@ PROJECT_FILE_MAP = {
     # Quốc tế
     "XKMPH":  ["ifthen_XKMPH.md"],
     "XKMMY":  ["ifthen_XKMMY.md"],
+    "XKMUS":  ["ifthen_IF_THEN_XKM_KTL.md"],
+    "XKMTL":  ["ifthen_KTLTL_TH.md", "ifthen_IF_THEN_XKM_KTL.md"],
     "KTLTL":  ["ifthen_KTLTL_TH.md"],
     "Thái":   ["ifthen_KTLTL_TH.md"],
     "TH":     ["ifthen_KTLTL_TH.md"],
