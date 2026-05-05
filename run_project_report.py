@@ -14,10 +14,17 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from brain_advisor import get_advice
+from brain_advisor import get_advice, detect_issues, load_brain_context
+import os
+
+try:
+    from anthropic import Anthropic
+    HAS_ANTHROPIC = True
+except ImportError:
+    HAS_ANTHROPIC = False
 
 SCRIPT_DIR = Path(__file__).parent
-SHEET_ID   = "1VtwiBZb-wq3ZX4ss-lYvcJqfsgZIZhifotu7dszw_m4"
+SHEET_ID   = "1FZj7u5y3TzRogBNkH_KxQflHOv2Dmfrq8p1Nski0Jb4"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG — Mapping project → Lark webhook
@@ -30,7 +37,7 @@ PROJECT_WEBHOOKS = {
     "MNVN": "https://open.larksuite.com/open-apis/bot/v2/hook/0c5022ee-375c-413e-b400-4b3a02d2d31e",
     "TDCVN": "https://open.larksuite.com/open-apis/bot/v2/hook/c27c9609-35f9-406f-b441-351fc1eb6e7f",
     "KTMVN": "https://open.larksuite.com/open-apis/bot/v2/hook/c0d15040-a328-4500-9358-97f5a634ac72",
-    "SRMVN": "https://open.larksuite.com/open-apis/bot/v2/hook/877a9dff-f9fd-4b12-8354-d0f7f833250d",
+    "SRMR": "https://open.larksuite.com/open-apis/bot/v2/hook/877a9dff-f9fd-4b12-8354-d0f7f833250d",
     "KTMR": "https://open.larksuite.com/open-apis/bot/v2/hook/9e781e8d-9a91-45d7-8c81-09ff41841178",
     "KTLTL": "https://open.larksuite.com/open-apis/bot/v2/hook/02743e78-30b3-4ecf-9f94-f9576513676f",
     "XKMMY": "https://open.larksuite.com/open-apis/bot/v2/hook/da40deff-b9e3-44bb-89e3-f4c5bc9a7aad",
@@ -137,6 +144,37 @@ def parse_value(s: str) -> float:
     except: return None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# FORMAT VND / NUMBER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def fmt(v_str: str) -> str:
+    """Format string value (VND, %, x) -> human readable (tr, M, K)"""
+    if not v_str or v_str in ("0", "—", ""):
+        return v_str
+    
+    val = parse_value(v_str)
+    if val is None:
+        return v_str
+    
+    # Nếu là %, giữ nguyên
+    if "%" in v_str:
+        return v_str
+
+    if val >= 1_000_000_000:
+        return f"{val/1_000_000_000:.1f}B"
+    if val >= 1_000_000:
+        return f"{val/1_000_000:.1f}M"
+    if val >= 1_000:
+        # Nếu là tiền đồng (CPA/CPM thường > 1000)
+        return f"{val/1_000:.1f}K"
+    
+    return v_str
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DETERMINE STATUS FROM VALUE vs BENCHMARK
+# ─────────────────────────────────────────────────────────────────────────────
+
 def status_from_benchmark(value_str: str, bench_str: str, metric_name: str) -> str:
     """Trả về 'red' / 'yellow' / 'green' / 'unknown'"""
     if not bench_str or not value_str:
@@ -195,14 +233,26 @@ def status_from_benchmark(value_str: str, bench_str: str, metric_name: str) -> s
 
 def _find_recent_data_cols(date_cols: dict, gmv_row: list, n_days: int = 3) -> list[tuple]:
     """
-    Tìm n_days cột NGÀY GẦN NHẤT (theo thứ tự calendar).
-    Luôn lấy ngày hiện tại + 2 ngày trước đó, kể cả khi chưa có data.
+    Tìm n_days cột NGÀY GẦN NHẤT không vượt quá ngày hiện tại.
+    Lọc bỏ các ngày trong tương lai (future dates từ sheet pre-populated).
     Trả về list[(col_idx, date_str)] — mới nhất trước.
     """
-    # Sắp xếp theo col index giảm dần (cột bên phải = ngày mới nhất)
-    sorted_cols = sorted(date_cols.keys(), reverse=True)
-    result = [(col_idx, date_cols[col_idx]) for col_idx in sorted_cols[:n_days]]
-    return result
+    today = datetime.now().date()
+    valid_cols = []
+    for col_idx, date_str in date_cols.items():
+        try:
+            year = datetime.now().year
+            d = datetime.strptime(f"{date_str[:5]}/{year}", "%d/%m/%Y").date()
+            # Nếu ngày parse ra > 6 tháng so với today, thử năm trước
+            if d > today and (d - today).days > 180:
+                d = datetime.strptime(f"{date_str[:5]}/{year-1}", "%d/%m/%Y").date()
+            if d <= today:
+                valid_cols.append((col_idx, date_str, d))
+        except Exception:
+            continue
+    # Sắp xếp theo ngày giảm dần (mới nhất trước)
+    valid_cols.sort(key=lambda x: x[2], reverse=True)
+    return [(col_idx, date_str) for col_idx, date_str, _ in valid_cols[:n_days]]
 
 
 def parse_project_metrics(rows: list[list], project: str, n_days: int = 3) -> dict:
@@ -215,10 +265,10 @@ def parse_project_metrics(rows: list[list], project: str, n_days: int = 3) -> di
 
     date_row = rows[1] if len(rows) > 1 else []
 
-    # Tìm tất cả cột có date header (col >= 6)
+    # Tìm tất cả cột có date header (bỏ qua col 0 = tên metric, col 1 = benchmark)
     date_cols = {}
     for i, v in enumerate(date_row):
-        if i >= 6 and re.match(r"\d{2}/\d{2}/\d{4}", v.strip()):
+        if i >= 2 and re.match(r"\d{2}/\d{2}/\d{4}", v.strip()):
             date_cols[i] = v.strip()
 
     # Tìm n_days cột mới nhất CÓ DATA THỰC TẾ (>0)
@@ -282,11 +332,21 @@ def parse_project_metrics(rows: list[list], project: str, n_days: int = 3) -> di
     # Dates list ordered mới → cũ
     report_dates = [d for _, d in recent_cols]
 
+    # Tìm Phase và Target (thường ở hàng 0 hoặc 1)
+    phase = ""
+    target = ""
+    for r in rows[:3]:
+        for c in r:
+            if "Phase" in c: phase = c.strip()
+            if "Target" in c: target = c.strip()
+
     return {
         "project":      project,
         "latest_date":  latest_date,
         "report_dates": report_dates,   # list ngày trong kỳ báo cáo
         "metrics":      metrics,
+        "phase":        phase,
+        "target":       target,
     }
 
 
@@ -323,159 +383,238 @@ def classify_issue(metric_name: str) -> str:
 # RENDER PER-PROJECT LARK MESSAGE
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _trend_arrow(values: list) -> str:
-    """Trả về trend arrow dựa trên list giá trị (mới→cũ)."""
-    nums = []
-    for v in values:
-        try:
-            nums.append(float(v.replace(",", "").replace("%", "").strip()))
-        except (ValueError, AttributeError):
-            pass
-    if len(nums) < 2:
+def _get_short_name(name: str) -> str:
+    name_map = {
+        "Tổng GMV": "GMV",
+        "Lần hiển thị": "Lượt HT",
+        "Tổng Số lượt hiển thị": "Lượt HT",
+        "CTR quảng cáo": "CTR",
+        "CVR quảng cáo": "CVR",
+        "CPM": "CPM",
+        "CPA": "CPA",
+    }
+    for k, v in name_map.items():
+        if k.lower() in name.lower():
+            return v
+    return name
+
+def _get_vn_weekday(date_str: str) -> str:
+    """VD: 28/04/2024 -> T3"""
+    try:
+        dt = datetime.strptime(date_str, "%d/%m/%Y")
+        days = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+        return days[dt.weekday()]
+    except:
         return ""
-    if nums[0] > nums[1] * 1.05:
-        return "📈"
-    elif nums[0] < nums[1] * 0.95:
-        return "📉"
-    return "➡️"
+
+def ai_analyze_project(parsed: dict) -> dict | None:
+    """
+    Gọi Claude API phân tích metrics + brain → trả về:
+      summary, issues (list), warning, actions (list), owner
+    Fallback None nếu không có API key hoặc lỗi.
+    """
+    if not HAS_ANTHROPIC:
+        return None
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+
+    project      = parsed["project"]
+    metrics      = parsed["metrics"]
+    report_dates = parsed.get("report_dates", [])
+    phase        = parsed.get("phase", "")
+    target       = parsed.get("target", "")
+
+    # Format date labels
+    date_labels = []
+    for d in reversed(report_dates):
+        wd = _get_vn_weekday(d)
+        date_labels.append(f"{wd} {d[:5]}")
+    header_dates = ", ".join(date_labels)
+
+    # Build metrics text — chỉ các chỉ số có data
+    metrics_lines = []
+    for m in metrics:
+        vals = []
+        for d in reversed(report_dates):
+            v = m["daily_values"].get(d, "—")
+            vals.append(v if v else "—")
+        val_str = " → ".join(vals) if len(vals) > 1 else (vals[0] if vals else "—")
+        if val_str in ("—", "— → —", "— → — → —"):
+            continue
+        bench  = m.get("benchmark", "—")
+        status = m.get("status", "unknown")
+        metrics_lines.append(
+            f"- {m['name']}: {val_str} | Benchmark: {bench} | Status: {status}"
+        )
+    metrics_text = "\n".join(metrics_lines[:50])
+
+    # Load brain context
+    brain_content = load_brain_context(project, max_chars=5000)
+
+    # Strip emojis from metrics_text to avoid JSON corruption
+    emoji_pattern = re.compile(
+        "["
+        u"\U0001F300-\U0001F9FF"
+        u"\U00002702-\U000027B0"
+        u"\U0000FE00-\U0000FE0F"
+        u"\u2600-\u26FF"
+        "]+", flags=re.UNICODE
+    )
+    metrics_text_clean = emoji_pattern.sub("", metrics_text)
+
+    def _build_prompt(metrics_txt: str, brain_txt: str) -> str:
+        return f"""Bạn là AI analyst của Hecatech — TikTok Shop performance marketing.
+Phân tích số liệu và tạo báo cáo Lark NGẮN GỌN.
+
+DỰ ÁN: {project} | {header_dates}
+
+SỐ LIỆU:
+{metrics_txt}
+
+PLAYBOOK:
+{brain_txt}
+
+---
+Trả về JSON thuần (không markdown, không code block, không xuống dòng trong string):
+{{"summary": "1 câu tình trạng + số liệu nổi bật nhất",
+"warning": "1 câu cảnh báo quan trọng nhất hoặc để trống nếu xanh",
+"actions": ["Hành động 1 — owner", "Hành động 2 — owner"],
+"owner": "owner chính"}}
+
+NGUYÊN TẮC:
+- Tiếng Việt CÓ DẤU đầy đủ. KHÔNG dùng emoji trong JSON string
+- Mỗi field tối đa 1 câu ngắn. Nếu xanh hết: warning="", actions=[]
+- Hành động bám playbook, không trích tên file, không bịa"""
+
+    def _parse_ai_response(text: str) -> dict | None:
+        text = text.strip()
+        text = re.sub(r'^```(?:json)?\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
+        m = re.search(r'\{.*\}', text, re.DOTALL)
+        if m:
+            text = m.group(0)
+        return json.loads(text)
+
+    client = Anthropic(api_key=api_key)
+
+    # Attempt 1: full brain context
+    try:
+        prompt1 = _build_prompt(metrics_text_clean, brain_content)
+        resp = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1800,
+            messages=[{"role": "user", "content": prompt1}],
+        )
+        return _parse_ai_response(resp.content[0].text)
+    except Exception as e1:
+        print(f"   ⚠️ AI attempt 1 loi: {e1}")
+
+    # Attempt 2: shorter brain context + fewer metrics
+    try:
+        short_brain = brain_content[:2000] if brain_content else ""
+        short_metrics = "\n".join(metrics_text_clean.splitlines()[:20])
+        prompt2 = _build_prompt(short_metrics, short_brain)
+        resp2 = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1200,
+            messages=[{"role": "user", "content": prompt2}],
+        )
+        return _parse_ai_response(resp2.content[0].text)
+    except Exception as e2:
+        print(f"   ⚠️ AI attempt 2 loi: {e2}")
+        return None
 
 
 def render_project_report(parsed: dict, mode: str) -> str:
-    """
-    Render báo cáo Group — hiển thị chỉ số CẢ 3 NGÀY gần nhất.
-    Group report chạy 3 ngày 1 lần, mỗi lần báo đầy đủ data 3 ngày.
-    """
-    project  = parsed["project"]
-    date     = parsed["latest_date"]
-    metrics  = parsed["metrics"]
-    report_dates = parsed.get("report_dates", [date])
-    n_report_days = len(report_dates)
+    project      = parsed["project"]
+    metrics      = parsed["metrics"]
+    report_dates = parsed.get("report_dates", [])
 
-    label = "📊 BÁO CÁO 3 NGÀY (Group Report)"
+    # Dates header: "T4 28/04, T5 29/04"
+    date_labels = [f"{_get_vn_weekday(d)} {d[:5]}" for d in reversed(report_dates)]
+    header_dates = ", ".join(date_labels)
 
-    lines = []
-    lines.append(f"Bot {project}: {label}")
-    lines.append(f"{'='*58}")
-    if n_report_days > 1:
-        lines.append(f"  {project} — {report_dates[-1]} → {report_dates[0]}")
-        lines.append(f"  Kỳ báo cáo: {n_report_days} ngày")
-    else:
-        lines.append(f"  {project} — {date}")
-    lines.append(f"{'='*58}")
+    # ── Gọi AI ──────────────────────────────────────────────────────────────
+    print(f"   🤖 Đang phân tích AI...")
+    ai = ai_analyze_project(parsed)
+
+    # ── Dòng 1: header ──────────────────────────────────────────────────────
+    lines = [f"📊 {project}  |  {header_dates}"]
+
+    # ── Dòng 2: AI summary (1 câu) ──────────────────────────────────────────
+    if ai and ai.get("summary"):
+        lines.append(ai["summary"])
+
     lines.append("")
 
-    # ── Tổng quan nhanh ─────────────────────────────────────────────────────
-    watched = [m for m in metrics if m["is_watched"] and m["latest"]]
-    n_red   = sum(1 for m in watched if m["status"] == "red")
-    n_yel   = sum(1 for m in watched if m["status"] == "yellow")
-    n_grn   = sum(1 for m in watched if m["status"] == "green")
-    overall = "🔴" if n_red >= 2 else "🟡" if n_red >= 1 or n_yel >= 3 else "🟢"
-
-    # Find key metrics
-    gmv_m    = next((m for m in metrics if m["name"] == "Tổng GMV"), None)
-    margin_m = next((m for m in metrics if "Net Profit" in m["name"]), None)
-    ln_m     = next((m for m in metrics if "LỢI NHUẬN RÒNG" in m["name"]), None)
-
-    lines.append("📊 TỔNG QUAN")
+    # ── Metrics: GMV + 5 chỉ số phễu (inline, compact) ─────────────────────
+    gmv_m = next((m for m in metrics if "Tổng GMV" in m["name"]), None)
     if gmv_m:
-        e = "✅" if gmv_m["status"] == "green" else "🟡" if gmv_m["status"] == "yellow" else "🔴"
-        lines.append(f"  Tổng GMV ngày: {gmv_m['latest']} {e}")
-        lines.append(f"  GMV MTD:       {gmv_m['mtd']}")
-    if margin_m:
-        e = "✅" if margin_m["status"] == "green" else "🟡" if margin_m["status"] == "yellow" else "🔴"
-        lines.append(f"  Net Margin:    {margin_m['latest']} {e}  (MTD: {margin_m['mtd']})")
-    if ln_m:
-        lines.append(f"  LN ròng ngày:  {ln_m['latest']}  (MTD: {ln_m['mtd']})")
-    lines.append(f"  Tổng trạng thái: {overall}  🔴 {n_red}  🟡 {n_yel}  ✅ {n_grn}")
-    lines.append("")
+        vals = [fmt(gmv_m["daily_values"].get(d, "—")) for d in reversed(report_dates)]
+        lines.append(f"GMV: {' | '.join(vals)}")
 
-    # ── Cảnh báo CHỈ 5 chỉ số chính: Impressions, CTR, CVR, CPM, CPA ────────
-    def _is_alert_metric(name: str) -> bool:
-        name_lower = name.lower()
-        return any(k.lower() in name_lower for k in ALERT_METRICS_5)
+    seen_short = set()
+    kpi_parts = []
+    for m_name in ALERT_METRICS_5:
+        m = next((m for m in metrics if m_name.lower() in m["name"].lower()), None)
+        if not m:
+            continue
+        short = _get_short_name(m["name"])
+        if short in seen_short:
+            continue
+        seen_short.add(short)
+        # Chỉ lấy ngày mới nhất + icon
+        latest_date = report_dates[0] if report_dates else ""
+        v = m["daily_values"].get(latest_date, "—")
+        icon = ""
+        if v and v not in ("0", "—", ""):
+            s = status_from_benchmark(v, m["benchmark"], m["name"])
+            icon = {"green": "✅", "yellow": "🟡", "red": "🔴"}.get(s, "")
+        kpi_parts.append(f"{short}: {fmt(v)}{icon}")
+    if kpi_parts:
+        lines.append("  ".join(kpi_parts))
 
-    alerts = [m for m in watched if m["status"] in ("red", "yellow") and _is_alert_metric(m["name"])]
+    # ── Warning + Actions ────────────────────────────────────────────────────
+    if ai:
+        warning_text = ai.get("warning", "")
+        actions_list = ai.get("actions", [])
+        owner        = ai.get("owner", "Team")
 
-    # Dedup: chỉ giữ 1 cảnh báo cho mỗi tên metric (lấy cái đỏ ưu tiên)
-    seen_names = {}
-    for m in alerts:
-        key = m["name"]
-        if key not in seen_names or m["status"] == "red":
-            seen_names[key] = m
-    alerts = list(seen_names.values())
-    # Sắp xếp: đỏ trước, vàng sau
-    alerts.sort(key=lambda x: (0 if x["status"] == "red" else 1))
+        if warning_text:
+            lines.append(f"\n⚠️ {warning_text}")
 
-    if alerts:
-        lines.append("─" * 58)
-        lines.append(f"⚠️  CẢNH BÁO ({len(alerts)} chỉ số cần xử lý)")
-        lines.append("")
-        for i, m in enumerate(alerts, 1):
-            e = "🔴" if m["status"] == "red" else "🟡"
-            bench_str = m["benchmark"][:60] if m["benchmark"] else "—"
+        if actions_list:
+            lines.append(f"→ " + f"\n→ ".join(actions_list[:2]))
+        elif not warning_text:
+            lines.append("✅ Xanh — duy trì vận hành.")
 
-            lines.append(f"  {i}. {e} {m['name']}")
-
-            # Hiển thị giá trị 3 ngày trong cảnh báo
-            dv = m.get("daily_values", {})
-            if n_report_days > 1 and dv:
-                day_vals = []
-                for d in report_dates:
-                    v = dv.get(d, "—")
-                    short_d = "/".join(d.split("/")[:2])
-                    if v and v not in ("0", ""):
-                        day_vals.append(f"{short_d}: {v}")
-                if day_vals:
-                    lines.append(f"     📅 {' → '.join(day_vals)}")
-            else:
-                lines.append(f"     Ngày {parsed['latest_date']}: {m['latest']}")
-
-            lines.append(f"     MTD: {m['mtd']}  |  Benchmark: {bench_str}")
-
-            # Advice từ brain — truyền đầy đủ context số thực
-            issue  = classify_issue(m["name"])
-            advice = get_advice(issue, {
-                "metric_name": m["name"],
-                "latest":      m["latest"],
-                "mtd":         m["mtd"],
-                "status":      m["status"],
-                "cp_ds":       0,
-            })
-            lines.append(f"     ↳ Nguyên nhân: {advice['root_cause']}")
-            lines.append(f"     ↳ Gợi ý hành động:")
-            for j, action in enumerate(advice["actions"][:3], 1):
-                lines.append(f"        {j}. {action}")
-            lines.append(f"     ↳ Owner: {advice['owner']}  |  SLA: {advice['sla']}")
-            if advice.get("playbook_ref") and advice["playbook_ref"] != "—":
-                lines.append(f"     📖 Theo: {advice['playbook_ref']}")
-            lines.append("")
     else:
-        lines.append("✅ Tất cả chỉ số đang xanh — không có cảnh báo")
-        lines.append("")
+        # Fallback rule-based
+        flat_data = {
+            "project": project,
+            "cp_ds":   parse_value(next((m["latest"] for m in metrics if "Ads/DS" in m["name"] or "CP/DS" in m["name"]), "0")),
+            "ln_day":  parse_value(next((m["latest"] for m in metrics if "LỢI NHUẬN RÒNG" in m["name"]), "0")),
+            "ds_day":  parse_value(next((m["latest"] for m in metrics if "Tổng GMV" in m["name"]), "0")),
+            "thr_red": parse_value(parsed.get("target", "0")),
+            "ty_le":   parse_value(next((m["latest"] for m in metrics if "Net Profit Margin" in m["name"]), "0")),
+            "status":  "red" if any(m["status"] == "red" for m in metrics) else "yellow" if any(m["status"] == "yellow" for m in metrics) else "green",
+        }
+        rule_issues = detect_issues(flat_data)
+        all_advice  = [get_advice(iss, parsed) for iss in rule_issues if get_advice(iss, parsed)]
 
-    # ── Điểm sáng (metrics xanh nổi bật) ────────────────────────────────────
-    bright = [m for m in watched if m["status"] == "green" and m["latest"]][:4]
-    if bright:
-        lines.append(f"─" * 58)
-        lines.append("✅ ĐIỂM SÁNG")
-        for m in bright:
-            lines.append(f"  - {m['name']}: {m['latest']} (MTD: {m['mtd']})")
-        lines.append("")
+        if all_advice:
+            critical = all_advice[0]
+            lines.append(f"\n⚠️ {critical.get('root_cause', '—')}")
+            acts = []
+            for adv in all_advice:
+                for act in adv.get("actions", []):
+                    if act not in acts:
+                        acts.append(act)
+            lines.append("→ " + f"\n→ ".join(acts[:2]))
+        else:
+            lines.append("✅ Xanh — duy trì vận hành.")
 
-    # ── Top việc ─────────────────────────────────────────────────────────────
-    if alerts:
-        lines.append("─" * 58)
-        lines.append("📋 TOP VIỆC CẦN XỬ LÝ")
-        top3 = alerts[:3]
-        for i, m in enumerate(top3, 1):
-            issue  = classify_issue(m["name"])
-            advice = get_advice(issue, {"cp_ds": 0})
-            action = advice["actions"][0] if advice["actions"] else "Xem playbook tương ứng"
-            lines.append(f"  {i}. {action} — {advice['owner']}")
-        lines.append("")
-
-    date_range = f"{report_dates[-1]} → {report_dates[0]}" if n_report_days > 1 else date
-    lines.append(f"🧠 [Brain: 9 playbooks | {project} | {date_range} | Chu kỳ: 3 ngày/lần]")
     return "\n".join(lines)
 
 # ─────────────────────────────────────────────────────────────────────────────
