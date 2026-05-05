@@ -207,16 +207,12 @@ Tiếng Việt có dấu đầy đủ, không markdown, không bullet, không xu
 # BUILD MESSAGE
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_message(data: dict, headline: str, mode: str) -> str:
-    now     = datetime.now().strftime("%d/%m/%Y %H:%M")
-    icon    = "🌅" if mode == "morning" else "🌆"
-    date_wd = _get_vn_weekday(data["date"])
+def _build_table(data: dict) -> str:
+    """Return plain ASCII table string (no backtick wrapping)."""
     markets = data.get("markets", {})
-
-    # Pre-render all values (ASCII-only names for table alignment)
     NAME_ASCII = {"Tổng": "Tong", "Thái": "Thai", "Malay": "Malay",
                   "Phil": "Phil", "Beucare": "Beucare", "Retolab": "Retolab"}
-    COL_HEADERS = ("Market", "DS", "CP", "CP/DS", "Ty le LN")
+    COL_HEADERS = ("Market", "DS", "CP", "CP/DS", "Ty le")
     rows_data = []
     for name in MARKET_ORDER:
         m = markets.get(name)
@@ -230,42 +226,60 @@ def build_message(data: dict, headline: str, mode: str) -> str:
             _fmt_pct(m["ty_le"]).replace("—", "-"),
         ))
 
-    # Column widths snug to data
     w = [max(len(COL_HEADERS[i]), max(len(r[i]) for r in rows_data)) for i in range(5)]
 
     def row_str(r):
         return f"{r[0]:<{w[0]}} | {r[1]:>{w[1]}} | {r[2]:>{w[2]}} | {r[3]:>{w[3]}} | {r[4]:>{w[4]}}"
 
-    divider = "-" * (sum(w) + 3 * 4 + 1)  # widths + " | " separators
-
-    # Table in code block for monospace alignment in Lark
-    table_lines = [row_str(COL_HEADERS), divider]
+    divider = "-" * (sum(w) + 3 * 4 + 1)
+    lines = [row_str(COL_HEADERS), divider]
     for r in rows_data:
-        table_lines.append(row_str(r))
+        lines.append(row_str(r))
         if r[0] == "Tong":
-            table_lines.append(divider)
-    table = "```\n" + "\n".join(table_lines) + "\n```"
-
-    # Full message
-    lines = [
-        f"📈 CEO BRIEFING  {icon}  {now}",
-        f"Ngay du lieu: {date_wd}",
-    ]
-    if headline:
-        lines.append("")
-        lines.append(headline)
-    lines.append("")
-    lines.append(table)
+            lines.append(divider)
     return "\n".join(lines)
+
+
+def build_card(data: dict, headline: str, mode: str) -> dict:
+    """Build Lark interactive card payload — renders code block in monospace."""
+    now     = datetime.now().strftime("%d/%m/%Y %H:%M")
+    icon    = "🌅" if mode == "morning" else "🌆"
+    date_wd = _get_vn_weekday(data["date"])
+    table   = _build_table(data)
+
+    subtitle = f"Ngay du lieu: {date_wd}"
+    if headline:
+        subtitle += f"\n\n{headline}"
+
+    elements = [
+        {
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": subtitle},
+        },
+        {
+            "tag": "div",
+            "text": {"tag": "lark_md", "content": f"```\n{table}\n```"},
+        },
+    ]
+
+    return {
+        "msg_type": "interactive",
+        "card": {
+            "header": {
+                "title": {"tag": "plain_text", "content": f"📈 CEO BRIEFING  {icon}  {now}"},
+                "template": "blue",
+            },
+            "elements": elements,
+        },
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SEND LARK
 # ─────────────────────────────────────────────────────────────────────────────
 
-def send_lark(webhook: str, text: str, label: str = "") -> bool:
-    payload = {"msg_type": "text", "content": {"text": text}}
-    data    = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+def send_lark(webhook: str, payload: dict, label: str = "") -> bool:
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req     = urllib.request.Request(
         webhook, data=data,
         headers={"Content-Type": "application/json; charset=utf-8"},
@@ -318,14 +332,14 @@ def main():
     print("✅" if headline else "skip")
 
     # 4. Build + preview
-    msg = build_message(data, headline, mode)
+    card = build_card(data, headline, mode)
     print()
-    print(msg)
+    print(_build_table(data))
     print()
 
     # 5. Send
     print("📤 Gửi CEO Lark...")
-    send_lark(CEO_WEBHOOK, msg, label=f"CEO [{mode}]")
+    send_lark(CEO_WEBHOOK, card, label=f"CEO [{mode}]")
     print("✅ Hoàn tất!")
 
 
