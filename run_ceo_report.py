@@ -213,49 +213,49 @@ def build_message(data: dict, headline: str, mode: str) -> str:
     date_wd = _get_vn_weekday(data["date"])
     markets = data.get("markets", {})
 
-    # Pre-render all values
-    COL_HEADERS = ("Thi truong", "DS", "CP", "CP/DS", "Ty le")
+    # Pre-render all values (ASCII-only names for table alignment)
+    NAME_ASCII = {"Tổng": "Tong", "Thái": "Thai", "Malay": "Malay",
+                  "Phil": "Phil", "Beucare": "Beucare", "Retolab": "Retolab"}
+    COL_HEADERS = ("Market", "DS", "CP", "CP/DS", "Ty le LN")
     rows_data = []
     for name in MARKET_ORDER:
         m = markets.get(name)
         if not m:
             continue
         rows_data.append((
-            name,
-            _fmt_vnd(m["doanh_so"]),
-            _fmt_vnd(m["chi_phi"]),
-            _fmt_pct(m["cp_ds"]),
-            _fmt_pct(m["ty_le"]),
+            NAME_ASCII.get(name, name),
+            _fmt_vnd(m["doanh_so"]).replace("—", "-"),
+            _fmt_vnd(m["chi_phi"]).replace("—", "-"),
+            _fmt_pct(m["cp_ds"]).replace("—", "-"),
+            _fmt_pct(m["ty_le"]).replace("—", "-"),
         ))
 
-    # Compute column widths from actual data
+    # Column widths snug to data
     w = [max(len(COL_HEADERS[i]), max(len(r[i]) for r in rows_data)) for i in range(5)]
 
-    def row_str(r, sep=" | "):
-        return f"{r[0]:<{w[0]}}{sep}{r[1]:>{w[1]}}{sep}{r[2]:>{w[2]}}{sep}{r[3]:>{w[3]}}{sep}{r[4]:>{w[4]}}"
+    def row_str(r):
+        return f"{r[0]:<{w[0]}} | {r[1]:>{w[1]}} | {r[2]:>{w[2]}} | {r[3]:>{w[3]}} | {r[4]:>{w[4]}}"
 
-    divider = "-+-".join("-" * c for c in w)
+    divider = "-" * (sum(w) + 3 * 4 + 1)  # widths + " | " separators
 
-    # Build message
+    # Table in code block for monospace alignment in Lark
+    table_lines = [row_str(COL_HEADERS), divider]
+    for r in rows_data:
+        table_lines.append(row_str(r))
+        if r[0] == "Tong":
+            table_lines.append(divider)
+    table = "```\n" + "\n".join(table_lines) + "\n```"
+
+    # Full message
     lines = [
         f"📈 CEO BRIEFING  {icon}  {now}",
-        f"Ngay: {date_wd}",
-        SEP,
+        f"Ngay du lieu: {date_wd}",
     ]
-
     if headline:
+        lines.append("")
         lines.append(headline)
-        lines.append(SEP)
-
-    lines.append(row_str(COL_HEADERS))
-    lines.append(divider)
-
-    for r in rows_data:
-        lines.append(row_str(r))
-        if r[0] == "Tong" or r[0] == "Tổng":
-            lines.append(divider)
-
-    lines.append(SEP)
+    lines.append("")
+    lines.append(table)
     return "\n".join(lines)
 
 
