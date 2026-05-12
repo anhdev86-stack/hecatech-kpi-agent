@@ -98,6 +98,29 @@ def parse_baocao(rows: list[list[str]]) -> dict:
     return {"date": date_str, "markets": markets}
 
 
+def parse_target_tiktok(rows: list[list[str]]) -> list[dict]:
+    """
+    Tìm dòng có 'Target Tiktok' ở col[9], đọc data Beucare/Retolab từ các dòng tiếp theo.
+    col[10]=brand, col[11]=target tháng, col[12]=thực đạt, col[13]=còn lại TB ngày
+    """
+    result = []
+    found = False
+    for row in rows:
+        if len(row) > 9 and "Target" in row[9]:
+            found = True
+            continue
+        if found:
+            if len(row) > 12 and row[10].strip():
+                brand   = row[10].strip()
+                target  = row[11].strip()
+                actual  = row[12].strip()
+                daily   = row[13].strip() if len(row) > 13 else ""
+                result.append({"brand": brand, "target": target, "actual": actual, "daily_remain": daily})
+            elif found and len(result) >= 2:
+                break
+    return result
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # FORMAT HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -195,12 +218,39 @@ Tiếng Việt có dấu đầy đủ, không markdown, không bullet, không xu
 # BUILD MESSAGE
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _build_target_table(targets: list[dict]) -> str:
+    """Target TikTok: Brand | Target T | Thuc dat | % dat | TB/ngay"""
+    if not targets:
+        return ""
+    headers = ("Brand", "Target tháng", "Thực đạt", "% đạt", "Còn lại/ngày")
+    rows_data = []
+    for t in targets:
+        target_n = int(t["target"].replace(",", "")) if t["target"].replace(",", "").isdigit() else 0
+        actual_n = int(t["actual"].replace(",", "")) if t["actual"].replace(",", "").isdigit() else 0
+        pct = f"{actual_n/target_n*100:.1f}%" if target_n else "—"
+        rows_data.append((
+            t["brand"],
+            _fmt_vnd(t["target"]),
+            _fmt_vnd(t["actual"]),
+            pct,
+            _fmt_vnd(t["daily_remain"]),
+        ))
+    w = [max(len(headers[i]), max(len(r[i]) for r in rows_data)) for i in range(5)]
+    def row_str(r):
+        return f"{r[0]:<{w[0]}} | {r[1]:>{w[1]}} | {r[2]:>{w[2]}} | {r[3]:>{w[3]}} | {r[4]:>{w[4]}}"
+    divider = "-" * (sum(w) + 3 * 4 + 1)
+    lines = [row_str(headers), divider]
+    for r in rows_data:
+        lines.append(row_str(r))
+    return "\n".join(lines)
+
+
 def _build_table(data: dict) -> str:
     """Return plain ASCII table string (no backtick wrapping)."""
     markets = data.get("markets", {})
-    NAME_ASCII = {"Tổng": "Tong", "Thái": "Thai", "Malay": "Malay",
+    NAME_ASCII = {"Tổng": "Tổng", "Thái": "Thái", "Malay": "Malay",
                   "Phil": "Phil", "Beucare": "Beucare", "Retolab": "Retolab"}
-    COL_HEADERS = ("Market", "DS", "CP", "CP/DS", "Ty le")
+    COL_HEADERS = ("Thị trường", "Doanh số", "Chi phí", "CP/DS", "Tỷ lệ LN")
     rows_data = []
     for name in MARKET_ORDER:
         m = markets.get(name)
@@ -223,7 +273,7 @@ def _build_table(data: dict) -> str:
     lines = [row_str(COL_HEADERS), divider]
     for r in rows_data:
         lines.append(row_str(r))
-        if r[0] == "Tong":
+        if r[0] == "Tổng":
             lines.append(divider)
     return "\n".join(lines)
 
@@ -277,11 +327,15 @@ def main():
         print("❌ Không parse được dữ liệu thị trường")
         return
 
+    targets = parse_target_tiktok(rows)
+
     print(f"  📅 Ngày dữ liệu: {data['date']}")
     for name in MARKET_ORDER:
         m = data["markets"].get(name)
         if m:
             print(f"     {name}: DS={_fmt_vnd(m['doanh_so'])}  CP={_fmt_vnd(m['chi_phi'])}  CP/DS={_fmt_pct(m['cp_ds'])}")
+    for t in targets:
+        print(f"     🎯 {t['brand']}: Target={_fmt_vnd(t['target'])}  Thực đạt={_fmt_vnd(t['actual'])}  TB/ngày={_fmt_vnd(t['daily_remain'])}")
 
     # 3. AI headline
     print("\n  🤖 AI headline...", end=" ", flush=True)
@@ -291,10 +345,13 @@ def main():
     # 4. Build + preview
     date_wd = _get_vn_weekday(data["date"])
     table   = _build_table(data)
-    lines   = [f"📈 CEO BRIEFING  🌅  {now}", f"Ngay du lieu: {date_wd}", ""]
+    lines   = [f"📈 CEO BRIEFING  🌅  {now}", f"Ngày dữ liệu: {date_wd}", ""]
     if headline:
         lines += [headline, ""]
     lines += ["```", table, "```"]
+    if targets:
+        target_table = _build_target_table(targets)
+        lines += ["", "🎯 TARGET TIKTOK THÁNG", "```", target_table, "```"]
     msg = "\n".join(lines)
     print()
     print(msg)

@@ -47,6 +47,36 @@ PROJECT_WEBHOOKS = {
     # Thêm các dự án khác ở đây...
 }
 
+LARK_USERS = {
+    "GiangNT": ("H0072",    "GiangNT"),
+    "TuTT":    ("H0033",    "TuTT"),
+    "AnhHK":   ("H0064",    "AnhHK"),
+    "HoanPM":  ("H0039",    "HoanPM"),
+    "SaoBT":   ("49d35g95", "SaoBT"),
+}
+
+PROJECT_OWNERS = {
+    "XKMVN": "GiangNT",
+    "XKMMY": "GiangNT",
+    "XKMPH": "GiangNT",
+    "MNVN":  "GiangNT",
+    "XKMTL": "AnhHK",
+    "KTLTL": "AnhHK",
+    "KTMVN": "SaoBT",
+    "KTMR":  "SaoBT",
+    "XKMUS": "SaoBT",
+    "SRMR":  "TuTT",
+    "KTLVN": "HoanPM",
+    "TDCVN": "HoanPM",
+}
+
+def lark_mention(name: str) -> str:
+    """Return Lark mention tag for a user name."""
+    if name in LARK_USERS:
+        uid, display = LARK_USERS[name]
+        return f'<at user_id="{uid}">{display}</at>'
+    return f"@{name}"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # KEY METRICS cần theo dõi (subset từ sheet)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -255,7 +285,7 @@ def _find_recent_data_cols(date_cols: dict, gmv_row: list, n_days: int = 3) -> l
 def parse_project_metrics(rows: list[list], project: str, n_days: int = 3) -> dict:
     """
     Parse metrics từ sheet, lấy dữ liệu n_days ngày gần nhất.
-    Group report mặc định n_days=3 (chạy 3 ngày 1 lần, báo chỉ số cả 3 ngày).
+    Mặc định n_days=3: mỗi 3 ngày chạy 1 lần, báo cáo 3 ngày gần nhất.
     """
     if not rows:
         return {}
@@ -546,7 +576,8 @@ def render_project_report(parsed: dict, mode: str) -> str:
     ai = ai_analyze_project(parsed)
 
     # ── Header ──────────────────────────────────────────────────────────────
-    lines = [f"📊 {project} — Báo cáo | {header_dates}"]
+    project_owner = PROJECT_OWNERS.get(project, "Team")
+    lines = [f"📊 {project} — Báo cáo | {header_dates} | {lark_mention(project_owner)}"]
 
     if phase or target:
         pt = f"{phase} | {target}".strip(" |")
@@ -593,8 +624,6 @@ def render_project_report(parsed: dict, mode: str) -> str:
         issues_list  = ai.get("issues", [])
         warning_text = ai.get("warning", "")
         actions_list = ai.get("actions", [])
-        owner        = ai.get("owner", "Team")
-
         if issues_list:
             lines.append("🔍 Vấn đề:")
             for i, iss in enumerate(issues_list, 1):
@@ -606,7 +635,7 @@ def render_project_report(parsed: dict, mode: str) -> str:
             lines.append("")
 
         if actions_list:
-            lines.append(f"✅ Hành động (@{owner}):")
+            lines.append(f"✅ Hành động ({lark_mention(project_owner)}):")
             for i, act in enumerate(actions_list, 1):
                 lines.append(f"{i}. {act}")
         elif not issues_list:
@@ -634,7 +663,7 @@ def render_project_report(parsed: dict, mode: str) -> str:
             lines.append("")
             lines.append(f"🚨🚨 CẢNH BÁO: Rủi ro {critical.get('risk_level', 'CAO')}. {critical.get('root_cause', '')}")
             lines.append("")
-            lines.append(f"✅ Hành động (@{all_advice[0].get('owner', 'Team')}):")
+            lines.append(f"✅ Hành động ({lark_mention(project_owner)}):")
             acts = []
             for adv in all_advice:
                 for act in adv.get("actions", []):
