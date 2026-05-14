@@ -8,7 +8,7 @@ Usage:
 """
 
 import csv, io, json, os, sys, urllib.request, urllib.error
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -28,6 +28,7 @@ BAOCAO_GID  = "228758703"
 CEO_WEBHOOK = "https://open.larksuite.com/open-apis/bot/v2/hook/ad36383c-06b9-48ee-ad3b-08dd771fa9fa"
 MODEL       = "claude-sonnet-4-6"
 SEP         = "─" * 44
+SENT_LOCK   = Path(__file__).parent / "logs" / "ceo_sent_date.txt"
 
 MARKET_ORDER = ["Tổng", "Beucare", "Retolab", "Thái", "Malay", "Phil"]
 
@@ -309,9 +310,25 @@ def send_lark(webhook: str, payload: dict, label: str = "") -> bool:
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _already_sent_today() -> bool:
+    today = date.today().isoformat()
+    if SENT_LOCK.exists() and SENT_LOCK.read_text().strip() == today:
+        return True
+    return False
+
+def _mark_sent_today():
+    SENT_LOCK.parent.mkdir(exist_ok=True)
+    SENT_LOCK.write_text(date.today().isoformat())
+
+
 def main():
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
     print(f"\n🚀 CEO BRIEFING | {now}\n")
+
+    # Chống gửi 2 lần cùng ngày
+    if _already_sent_today():
+        print("  ⏭️  Đã gửi hôm nay rồi — bỏ qua.")
+        return
 
     # 1. Fetch
     print("  📊 Đang lấy dữ liệu sheet Báo cáo...", end=" ", flush=True)
@@ -359,7 +376,9 @@ def main():
 
     # 5. Send
     print("📤 Gửi CEO Lark...")
-    send_lark(CEO_WEBHOOK, msg, label="CEO [9:00]")
+    ok = send_lark(CEO_WEBHOOK, msg, label="CEO [9:00]")
+    if ok:
+        _mark_sent_today()
     print("✅ Hoàn tất!")
 
 
