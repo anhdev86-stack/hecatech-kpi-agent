@@ -13,6 +13,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Load ANTHROPIC_API_KEY từ .env nếu chưa có trong env
+_ENV_PATHS = [
+    Path(__file__).parent / ".env",
+    Path("/Users/admin/Desktop/AI Locker/.env"),
+]
+for _ep in _ENV_PATHS:
+    if _ep.exists() and not os.environ.get("ANTHROPIC_API_KEY"):
+        for _line in _ep.read_text().splitlines():
+            if _line.startswith("ANTHROPIC_API_KEY="):
+                os.environ["ANTHROPIC_API_KEY"] = _line.split("=", 1)[1].strip()
+                break
+
 try:
     from anthropic import Anthropic
     HAS_ANTHROPIC = True
@@ -362,7 +374,7 @@ def main():
     # 4. Build + preview
     date_wd = _get_vn_weekday(data["date"])
     table   = _build_table(data)
-    lines   = [f"📈 CEO BRIEFING  🌅  {now}", f"Ngày dữ liệu: {date_wd}", ""]
+    lines   = [f"📊 CEO BRIEFING 🇻🇳 {now}", f"Ngày dữ liệu: {date_wd}", ""]
     if headline:
         lines += [headline, ""]
     lines += ["```", table, "```"]
